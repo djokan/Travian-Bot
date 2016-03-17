@@ -17,32 +17,47 @@ class travian(object):
 
 
         while 1:
+            if self.loggedIn:
+                self.villages()
+            else:
+                self.login()
+                self.villages()
+            '''
             try:
-                time.sleep(10)
-
                 if self.loggedIn:
                     print(time.time())
                     self.villages()
                 else:
                     print('not login try login again.')
                     self.login()
+                    self.villages()
             except:
                 self.login()
+                '''
+            time.sleep(600)
 
 
     def villages(self):
+
         for vid in self.config['vids']:
             self.vid=str(vid)
             try:
                 buildType=self.config['villages'][vid]['buildType']
             except:
+                self.config['villages'][vid]={}
                 buildType='resource'
-            print(buildType)
+            print('Village: '+str(vid)+' build type:'+buildType)
             if buildType == '0':
                 pass
             elif buildType == 'resource':
                 print('Start min Resource Building')
                 self.build('resource')
+            elif buildType == 'building':
+                print('Start to build building '+ str(self.config['villages'][vid]['building']))
+                #self.config['villages'][vid]['building']
+                fieldId=int( self.config['villages'][vid]['building'])
+                if fieldId > 0:
+                    self.buildBuilding(fieldId)
 
     def build(self,type):
         try:
@@ -53,10 +68,11 @@ class travian(object):
             return False
         html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
         dorf1=self.anlysisDorf1(html)
+        print(dorf1)
         self.config['villages'][self.vid]['delay']=dorf1['delay']
         self.config['villages'][self.vid]['resource']=dorf1['resource']
         self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
-        print(dorf1)
+
         if type == 'resource':
             #if dorf1['delay'] == 0:
 
@@ -67,11 +83,11 @@ class travian(object):
             foodProduction=int(dorf1['resource'][3])
 
 
-            if stockBarWarehouse<withoutFoodMaxProduction*5:
+            if stockBarWarehouse<withoutFoodMaxProduction*100 and stockBarWarehouse < 10000 or stockBarWarehouse<withoutFoodMaxProduction*10 and stockBarWarehouse < 80000:
                 print('Start to build WareHouse')
                 self.buildBuilding(29)
                 return True
-            if stockBarWarehouse<foodProduction*5:
+            if stockBarGranary<foodProduction*100 and stockBarGranary < 10000 or stockBarGranary<foodProduction*10 and stockBarGranary < 80000:
                 print('Start to build Garanary')
                 self.buildBuilding(25)
                 return True
@@ -81,6 +97,31 @@ class travian(object):
             fieldId=self.buildFindMinField()
             if fieldId:
                 self.buildBuilding(fieldId)
+
+
+    def buildBuilding(self, filedId):
+        print('Start Building on Village '+ str(self.vid) +' field '+str(filedId))
+        if filedId <=18:
+            dorf=1
+        else:
+            dorf=2
+        #upgrade
+        #http://ts20.travian.tw/build.php?id=29
+        html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
+
+        #print(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
+        try:
+            m=re.search('(?<=&amp;c=)(\w+)',html)
+        #maybe not enough resource.
+        except:
+            return False
+        if m == None:
+            return False
+        c = m.group(0)
+
+        #http://ts20.travian.tw/dorf2.php?a=18&id=31&c=130461
+        self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.vid))
+        #self.sendRequest(self.server+'dorf2.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.village))
 
     def buildFindMinField(self):
         dorf1=self.config['villages'][self.vid]
@@ -118,31 +159,12 @@ class travian(object):
             return minLevelKey+1;
         return False;
 
-
-
-    def buildBuilding(self, filedId):
-        print('Start Building on Village '+ str(self.vid) +' field '+str(filedId))
-        if filedId <=18:
-            dorf=1
-        else:
-            dorf=2
-        #upgrade
-        #http://ts20.travian.tw/build.php?id=29
-        html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
-
-        #print(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
-        m=re.search('(?<=&amp;c=)(\w+)',html)
-
-        #maybe not enough resource.
-        if not m:
-            return False
-        c = m.group(0)
-        #http://ts20.travian.tw/dorf2.php?a=18&id=31&c=130461
-        self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.vid))
-        #self.sendRequest(self.server+'dorf2.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.village))
-
+    def analysisDorf2(self,html):
+        return False
     def anlysisDorf1(self,html):
         dorf1={}
+        if not html:
+            return False
         parser = BeautifulSoup(html, "html5lib")
         fields = parser.find_all('div', {'class': 'labelLayer'})
         fieldsList = [field.find_parent('div')['class'] for field in fields]
@@ -269,9 +291,9 @@ class travian(object):
 
 
 
-        if self.loggedIn and not 'ajax.php' in url:
-            if 'playerName' not in html.text:
+        if self.loggedIn and not 'ajax.php' in url and not self.config['server']==url:
 
+            if 'playerName' not in html.text:
                 #log.warn('Suddenly logged off')
                 print('Suddenly logged off')
                 self.loggedIn = False
