@@ -3,7 +3,8 @@ from bs4 import BeautifulSoup
 import re
 import time
 import json
-
+import datetime
+from random import randint
 
 class travian(object):
     def __init__(self):
@@ -11,6 +12,7 @@ class travian(object):
         self.delay=3
         self.vid=0 #village id
         self.getConfig()
+	self.proxies = dict(http='socks5://127.0.0.1:9050',https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
         self.login()
@@ -34,7 +36,9 @@ class travian(object):
             except:
                 self.login()
                 '''
-            time.sleep(600)
+            sleepDelay = randint(100,300)
+            print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
+            time.sleep(sleepDelay)
 
 
     def villages(self):
@@ -76,25 +80,26 @@ class travian(object):
         if type == 'resource':
             #if dorf1['delay'] == 0:
 
-            #check Storage
-            stockBarWarehouse=int(dorf1['resource'][8])
-            stockBarGranary=int(dorf1['resource'][11])
-            withoutFoodMaxProduction=int(max([dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2]]))
-            foodProduction=int(dorf1['resource'][3])
+            #check 
+
+            #stockBarWarehouse=int(dorf1['resource'][8])
+            #stockBarGranary=int(dorf1['resource'][11])
+            #withoutFoodMaxProduction=int(max([dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2]]))
+            #foodProduction=int(dorf1['resource'][3])
 
 
-            if stockBarWarehouse<withoutFoodMaxProduction*100 and stockBarWarehouse < 10000 or stockBarWarehouse<withoutFoodMaxProduction*10 and stockBarWarehouse < 80000:
-                print('Start to build WareHouse')
-                self.buildBuilding(29)
-                return True
-            if stockBarGranary<foodProduction*100 and stockBarGranary < 10000 or stockBarGranary<foodProduction*10 and stockBarGranary < 80000:
-                print('Start to build Garanary')
-                self.buildBuilding(25)
-                return True
+            #if stockBarWarehouse<withoutFoodMaxProduction*100 and stockBarWarehouse < 10000 or stockBarWarehouse<withoutFoodMaxProduction*10 and stockBarWarehouse < 80000:
+            #    print('Start to build WareHouse')
+            #    self.buildBuilding(29)
+            #    return True
+            #if stockBarGranary<foodProduction*100 and stockBarGranary < 10000 or stockBarGranary<foodProduction*10 and stockBarGranary < 80000:
+            #    print('Start to build Garanary')
+            #    self.buildBuilding(25)
+            #    return True
 
             #find min resource and fieldID
 
-            fieldId=self.buildFindMinField()
+            fieldId=self.buildFindMinFieldModified()
             if fieldId:
                 self.buildBuilding(fieldId)
 
@@ -111,6 +116,13 @@ class travian(object):
 
         #print(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
         try:
+            try:
+                m=re.search('waiting loop',html)
+                if m != None:
+                    print 'waiting loop detected!'
+                    return False
+            except:
+                return False
             m=re.search('(?<=&amp;c=)(\w+)',html)
         #maybe not enough resource.
         except:
@@ -159,6 +171,48 @@ class travian(object):
             return minLevelKey+1;
         return False;
 
+    def buildFindMinFieldModified(self):
+        dorf1=self.config['villages'][self.vid]
+        resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
+        fieldsList=dorf1['fieldsList']
+        newFieldsList={}
+        notTopGidsList=[]
+        minlvl = 30
+        for i in range(len(fieldsList)):
+            if fieldsList[i]['level'] < minlvl:
+                minlvl = fieldsList[i]['level']
+        for i in range(len(fieldsList)):
+            if fieldsList[i]['level'] == minlvl:
+                newFieldsList[i]=fieldsList[i];
+                if fieldsList[i]['gid'] not in notTopGidsList:
+                    notTopGidsList.append(fieldsList[i]['gid'])
+        print(newFieldsList)
+        #the resource list removed the all 10 level
+        newResource={}
+        minResourceWithoutTop=999999999999999
+        minResourceWithoutTopKey=999999999999999  #always less then 5
+        for i in range(len(resource)):
+            if i+1 in notTopGidsList:
+                if(resource[i]<minResourceWithoutTop):
+                    minResourceWithoutTop=resource[i]
+                    minResourceWithoutTopKey=i+1
+        if minResourceWithoutTopKey > 5:
+            return False
+        if self.lackOfCrop == True:
+            minResourceWithoutTopKey = 4
+        minLevel=999999999999
+        minLevelKey=99999999999
+
+        for i in newFieldsList:
+            if newFieldsList[i]['gid'] == minResourceWithoutTopKey:
+                if newFieldsList[i]['level'] <minLevel:
+                    minLevel= newFieldsList[i]['level']
+                    minLevelKey=i
+
+        if minLevelKey < 18: #it always less then 18
+            return minLevelKey+1;
+        return False;
+
     def analysisDorf2(self,html):
         return False
     def anlysisDorf1(self,html):
@@ -169,14 +223,12 @@ class travian(object):
         fields = parser.find_all('div', {'class': 'labelLayer'})
         fieldsList = [field.find_parent('div')['class'] for field in fields]
         newFieldList={}
+        self.lackOfCrop = False
         for i in range(len(fieldsList)):
-            if fieldsList[i][3] == 'underConstruction':
-                gid=fieldsList[i][4].replace('gid','')
-                level=fieldsList[i][5].replace('level','')
-            else:
-                gid=fieldsList[i][3].replace('gid','')
-                level=fieldsList[i][4].replace('level','')
-
+            if (len(fieldsList[i])<5):
+                self.lackOfCrop = True
+            gid=fieldsList[i][len(fieldsList[i])-2].replace('gid','')
+            level=fieldsList[i][len(fieldsList[i])-1].replace('level','')
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
 
@@ -209,6 +261,12 @@ class travian(object):
         with open('config.json','r+') as configFile:
             self.config=json.load(configFile)
             configFile.close()
+        if 'proxies' in self.config:
+            self.proxies = dict()
+            if 'http' in self.config['proxies']:
+                self.proxies['http'] = self.config['proxies']['http']
+            if 'https' in self.config['proxies']:
+                self.proxies['https'] = self.config['proxies']['https']
     def saveConfig(self):
          with open('config.json','r+') as configFile:
             self.config=json.load(configFile)
@@ -240,30 +298,26 @@ class travian(object):
         self.getInfo(html)
 
     def getInfo(self, html):
-        villageVidsCompile=re.compile('\?newdid=(\d+)')
+        villageVidsCompile=re.compile('coordinateX&')
         villageVids = villageVidsCompile.findall(html)
         villageAmount = len(villageVids)
         nationCompile=re.compile('nation(\d)')
         nation = nationCompile.findall(html)[0]
-        xCompile=re.compile('coordinateX">\(&#x202d;&(#45;)*&*#x202d;(\d+)')
+        xCompile=re.compile('coordinateX&quot;&gt;\(&amp;#x202d;(-?\d+)')
         X = xCompile.findall( html)
-        yCompile=re.compile('coordinateY">&#x202d;&(#45;)*&*#x202d;(\d+)')
+        yCompile=re.compile('coordinateY&quot;&gt;&amp;#x202d;(-?\d+)')
         Y = yCompile.findall( html)
         ajaxTokenCompile=re.compile('ajaxToken\s*=\s*\'(\w+)\'')
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         x = []
         y = []
         for i in range(villageAmount):
-            if '#45' in X[i][0]:
-                x.append('-%s' %X[i][1])
-            else:
-                x.append(X[i][1])
-            if '#45' in Y[i][0]:
-                y.append('-%s' %Y[i][1])
-            else:
-                y.append(Y[i][1])
+            x.append(X[i])
+            y.append(Y[i])
         self.config['villagesAmount']=villageAmount
-        self.config['vids']=villageVids
+        self.config['vids'] = []
+        for vid in self.config['villages']:
+	    self.config['vids'].append(vid) 
         self.config['x']=x
         self.config['y']=y
         self.config['nation']=nation
@@ -277,14 +331,21 @@ class travian(object):
         time.sleep(self.delay)
         #print(url)
         #print(len(data))
+        
         try:
             if len(data) == 0:
                 #print('get')
                 #html = requests.get(url,headers=self.headers,cookies=self.cookies)
-                html=self.session.get(url,headers=self.config['headers'])
+                if 'proxies' in self.config:
+                    html=self.session.get(url,headers = self.config['headers'], proxies=self.proxies)
+                else:
+                    html=self.session.get(url,headers=self.config['headers'])
             else:
                 #print('POST')
-                html=self.session.post(url,headers=self.config['headers'],data=data)
+                if 'proxies' in self.config:
+                    html=self.session.post(url,headers=self.config['headers'],data=data, proxies=self.proxies)
+                else:
+                    html=self.session.post(url,headers=self.config['headers'],data=data)
         except:
             print('Net problem, cant fetch the URL'+url)
             return False
