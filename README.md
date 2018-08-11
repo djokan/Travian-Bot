@@ -31,9 +31,9 @@ example:
     }
   }
 
-  [vid]: village id (can be obtained from link when village name on right side clicked. It is number and can be found after at newdid= in link.
+    [vid]: village id (can be obtained from link when village name on right side clicked. It is number and can be found after at newdid= in link.
   
-  [buildtype]: can be "resource"- build minimal level resource field which resource amount is minimal.
+    [buildtype]: can be "resource"- build minimal level resource field which resource amount is minimal.
   
   
   
