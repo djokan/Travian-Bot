@@ -1,0 +1,19 @@
+{
+  "username": "xxx",
+  "password": "xxx",
+  "server": "https://tx3.travian.com/",
+  "proxies": {
+    "http" : "socks5://127.0.0.1:9050",
+    "https" : "socks5://127.0.0.1:9050"
+  },
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"
+  },
+  "storage":30439,
+  "villages": {
+    "22030": {
+      "id": 22030,
+      "buildType": "resource"
+    }
+  }
+}

@@ -19,24 +19,15 @@ class travian(object):
 
 
         while 1:
-            if self.loggedIn:
-                self.villages()
-            else:
-                self.login()
-                self.villages()
-            '''
             try:
-                if self.loggedIn:
-                    print(time.time())
-                    self.villages()
-                else:
-                    print('not login try login again.')
+                if self.loggedIn==False:
                     self.login()
-                    self.villages()
+                self.villages()
             except:
-                self.login()
-                '''
-            sleepDelay = randint(100,300)
+                print('Waiting for internet connection (30 sec)')
+                time.sleep(30)
+                continue
+            sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
 
@@ -99,7 +90,7 @@ class travian(object):
 
             #find min resource and fieldID
 
-            fieldId=self.buildFindMinFieldModified()
+            fieldId=self.buildFindMinField()
             if fieldId:
                 self.buildBuilding(fieldId)
 
