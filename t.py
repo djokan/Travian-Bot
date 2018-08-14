@@ -16,8 +16,6 @@ class travian(object):
         self.session = requests.Session()
         self.loggedIn=False
         self.login()
-
-
         while 1:
             try:
                 if self.loggedIn==False:
@@ -48,6 +46,17 @@ class travian(object):
                 print('Start min Resource Building')
                 self.build('resource')
             elif buildType == 'building':
+                print('Start to build building '+ str(self.config['villages'][vid]['building']))
+                #self.config['villages'][vid]['building']
+                fieldId=int( self.config['villages'][vid]['building'])
+                if fieldId > 0:
+                    self.buildBuilding(fieldId)
+            elif buildType == 'both':
+                print('Start min Resource Building')
+                self.build('resource')
+                tempDelay = randint(5,30)
+                print('sleeping for ' + str(tempDelay) + " seconds")
+                time.sleep(tempDelay)
                 print('Start to build building '+ str(self.config['villages'][vid]['building']))
                 #self.config['villages'][vid]['building']
                 fieldId=int( self.config['villages'][vid]['building'])

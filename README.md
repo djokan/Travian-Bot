@@ -28,12 +28,11 @@ example:
     "[vid]": {
       "id": [vid],
       "buildType": "[buildtype]"
+      "building": "[building_id]"
     }
   }
 
    [vid]: village id (can be obtained from link when village name on right side clicked. It is number and can be found after at newdid= in link.
   
-   [buildtype]: can be "resource"- build minimal level resource field which resource amount is minimal.
-  
-  
-  
+   [buildtype]: can be "resource"- build minimal level resource field which resource amount is minimal. "building" builds building at field id given at "building" field."both" = builds both resource and building (effective only when roman)
+
