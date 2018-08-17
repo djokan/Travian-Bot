@@ -22,7 +22,9 @@ class travian(object):
                 if self.loggedIn==False:
                     self.login()
                 self.villages()
-            except:
+                self.getConfigViaTemp()
+            except Exception as e:
+                print(e)
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
@@ -63,7 +65,7 @@ class travian(object):
             elif buildType == 'both':
                 print('Start min Resource Building')
                 self.build('resource')
-                tempDelay = randint(5,30)
+                tempDelay = randint(5,15)
                 print('sleeping for ' + str(tempDelay) + " seconds")
                 time.sleep(tempDelay)
                 print('Start to build building '+ str(self.config['villages'][vid]['building']))
@@ -231,7 +233,24 @@ class travian(object):
         return dorf1
 
 
-
+    def getConfigViaTemp(self):
+        with open('config.json','r+') as configFile:
+            self.tempconfig=json.load(configFile)
+            configFile.close()
+            self.config = self.tempconfig
+        if 'proxies' in self.config:
+            self.proxies = dict()
+            if 'http' in self.config['proxies']:
+                self.proxies['http'] = self.config['proxies']['http']
+            if 'https' in self.config['proxies']:
+                self.proxies['https'] = self.config['proxies']['https']
+        html=self.sendRequest( self.config['server'] + 'dorf1.php', {})
+        if html==False:
+            return False
+        self.loggedIn=True
+        #soup=BeautifulSoup(h.text, "html5lib")
+        #print(soup.prettify())
+        self.getInfo(html)
     def getConfig(self):
         with open('config.json','r+') as configFile:
             self.config=json.load(configFile)
