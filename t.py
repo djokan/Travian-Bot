@@ -25,7 +25,7 @@ class travian(object):
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
-            sleepDelay = randint(500,800)
+            sleepDelay = randint(100,300)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
 
@@ -158,6 +158,8 @@ class travian(object):
                     minResourceWithoutTopKey=i+1
         if minResourceWithoutTopKey > 5:
             return False
+        if self.lackOfCrop == True:
+            minResourceWithoutTopKey = 4
         minLevel=999999999999
         minLevelKey=99999999999
 
