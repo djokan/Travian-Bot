@@ -12,6 +12,7 @@ class travian(object):
         self.delay=3
         self.vid=0 #village id
         self.getConfig()
+        self.minlvl = -1
 	self.proxies = dict(http='socks5://127.0.0.1:9050',https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
@@ -25,13 +26,21 @@ class travian(object):
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
-            sleepDelay = randint(100,300)
+            if self.minlvl == -1:
+                sleepDelay = randint(500,800)
+            else:
+                if self.minlvl<6:
+                    sleepDelay = randint(100,300)
+                elif self.minlvl<8:
+                    sleepDelay = randint(300,500)
+                else:
+                    sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
 
 
     def villages(self):
-
+        self.minlvl = -1
         for vid in self.config['vids']:
             self.vid=str(vid)
             try:
@@ -141,54 +150,18 @@ class travian(object):
         fieldsList=dorf1['fieldsList']
         newFieldsList={}
         notTopGidsList=[]
+        minlvl = 30
+        for i in range(len(fieldsList)):
+            if fieldsList[i]['level'] < minlvl:
+                minlvl = fieldsList[i]['level']
+        if self.minlvl == -1 or self.minlvl>minlvl:
+            self.minlvl = minlvl
         for i in range(len(fieldsList)):
             if fieldsList[i]['level'] <10:
                 newFieldsList[i]=fieldsList[i];
                 if fieldsList[i]['gid'] not in notTopGidsList:
                     notTopGidsList.append(fieldsList[i]['gid'])
 
-        #the resource list removed the all 10 level
-        newResource={}
-        minResourceWithoutTop=999999999999999
-        minResourceWithoutTopKey=999999999999999  #always less then 5
-        for i in range(len(resource)):
-            if i+1 in notTopGidsList:
-                if(resource[i]<minResourceWithoutTop):
-                    minResourceWithoutTop=resource[i]
-                    minResourceWithoutTopKey=i+1
-        if minResourceWithoutTopKey > 5:
-            return False
-        if self.lackOfCrop == True:
-            minResourceWithoutTopKey = 4
-        minLevel=999999999999
-        minLevelKey=99999999999
-
-        for i in newFieldsList:
-            if newFieldsList[i]['gid'] == minResourceWithoutTopKey:
-                if newFieldsList[i]['level'] <minLevel:
-                    minLevel= newFieldsList[i]['level']
-                    minLevelKey=i
-
-        if minLevelKey < 18: #it always less then 18
-            return minLevelKey+1;
-        return False;
-
-    def buildFindMinFieldModified(self):
-        dorf1=self.config['villages'][self.vid]
-        resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
-        fieldsList=dorf1['fieldsList']
-        newFieldsList={}
-        notTopGidsList=[]
-        minlvl = 30
-        for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] < minlvl:
-                minlvl = fieldsList[i]['level']
-        for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] == minlvl:
-                newFieldsList[i]=fieldsList[i];
-                if fieldsList[i]['gid'] not in notTopGidsList:
-                    notTopGidsList.append(fieldsList[i]['gid'])
-        print(newFieldsList)
         #the resource list removed the all 10 level
         newResource={}
         minResourceWithoutTop=999999999999999
