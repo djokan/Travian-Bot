@@ -31,9 +31,9 @@ class travian(object):
             if self.minlvl == -1:
                 sleepDelay = randint(500,800)
             else:
-                if self.minlvl<6:
+                if self.minlvl<4:
                     sleepDelay = randint(100,300)
-                elif self.minlvl<8:
+                elif self.minlvl<6:
                     sleepDelay = randint(300,500)
                 else:
                     sleepDelay = randint(500,800)
