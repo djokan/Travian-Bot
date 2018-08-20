@@ -175,7 +175,7 @@ class travian(object):
                     minResourceWithoutTopKey=i+1
         if minResourceWithoutTopKey > 5:
             return False
-        if self.lackOfCrop == True:
+        if self.greyField == True and dorf1['stockBarFreeCrop']<10:
             minResourceWithoutTopKey = 4
         minLevel=999999999999
         minLevelKey=99999999999
@@ -200,20 +200,24 @@ class travian(object):
         fields = parser.find_all('div', {'class': 'labelLayer'})
         fieldsList = [field.find_parent('div')['class'] for field in fields]
         newFieldList={}
-        self.lackOfCrop = False
+        self.greyField = False
         for i in range(len(fieldsList)):
             if (len(fieldsList[i])<5):
-                self.lackOfCrop = True
+                self.greyField = True
             gid=fieldsList[i][len(fieldsList[i])-2].replace('gid','')
             level=fieldsList[i][len(fieldsList[i])-1].replace('level','')
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
-
-
+        
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;(\d*)')
+        prs = productionCompile.findall(html)
+        for i in range(len(prs)):
+            dorf1['stockBarFreeCrop']=int(prs[i])
         productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             prs[i]=int(prs[i])
+        
         dorf1['resource'] =prs
         isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
 
