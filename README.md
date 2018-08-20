@@ -36,3 +36,4 @@ example:
   
    [buildtype]: can be "resource"- build minimal level resource field which resource amount is minimal. "building" builds building at field id given at "building" field."both" = builds both resource and building (effective only when roman)
 
+WARNING!!! This bot is made for experimental purposes only. Using this bot violates Travian Game Rules.
