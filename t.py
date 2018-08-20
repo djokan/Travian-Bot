@@ -4,6 +4,7 @@ import re
 import time
 import json
 import datetime
+import traceback
 from random import randint
 
 class travian(object):
@@ -24,7 +25,7 @@ class travian(object):
                 self.villages()
                 self.getConfigViaTemp()
             except Exception as e:
-                print(e)
+                print(traceback.format_exc())
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
@@ -87,7 +88,7 @@ class travian(object):
         self.config['villages'][self.vid]['delay']=dorf1['delay']
         self.config['villages'][self.vid]['resource']=dorf1['resource']
         self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
-
+        self.config['villages'][self.vid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
         if type == 'resource':
             #if dorf1['delay'] == 0:
 
