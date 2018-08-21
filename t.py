@@ -14,7 +14,6 @@ def getFirstMarketplaceData(html):
     data = {}
     names = ["id","t"]
     for name in names:
-        print(name)
         data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
     data['cmd']='prepareMarketplace'
     data['x2']='1'
@@ -24,7 +23,6 @@ def getSecondMarketplaceData(html):
     data = {}
     names = ["id","t","a","sz","kid","c"]
     for name in names:
-        print(name)
         data[name] = getRegexValue(html,'name=\\\\"'+name+'\\\\"[^>]+value=\\\\"([^\\\\]*)\\\\"')
     data['cmd']='prepareMarketplace'
     data['x2']='1'
