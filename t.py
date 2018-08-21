@@ -7,6 +7,28 @@ import datetime
 import traceback
 from random import randint
 
+def getRegexValue(stringFrom,regex):
+    idbCompile=re.compile(regex,re.S)
+    return idbCompile.findall(stringFrom)[0]
+def getFirstMarketplaceData(html):
+    data = {}
+    names = ["id","t"]
+    for name in names:
+        print(name)
+        data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
+    data['cmd']='prepareMarketplace'
+    data['x2']='1'
+    data['ajaxToken']=getRegexValue(html,'contraceptiveBluebottles.+return \'([a-z\d]+)\';')
+    return data
+def getSecondMarketplaceData(html):
+    data = {}
+    names = ["id","t","a","sz","kid","c"]
+    for name in names:
+        print(name)
+        data[name] = getRegexValue(html,'name=\\\\"'+name+'\\\\"[^>]+value=\\\\"([^\\\\]*)\\\\"')
+    data['cmd']='prepareMarketplace'
+    data['x2']='1'
+    return data
 class travian(object):
     def __init__(self):
         self.config={}
@@ -40,8 +62,30 @@ class travian(object):
                     sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
-
-
+    def sendResources(self,x,y,r1,r2,r3,r4):
+        html = self.goToBuildingByName('Marketplace')
+        data = getFirstMarketplaceData(html)
+        data['r1'] = r1
+        data['r2'] = r2
+        data['r3'] = r3
+        data['r4'] = r4
+        data['x'] = x
+        data['y'] = y
+        data['dname'] = ''
+        token = data['ajaxToken']
+        html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        data = getSecondMarketplaceData(html)
+        data['r1'] = r1
+        data['r2'] = r2
+        data['r3'] = r3
+        data['r4'] = r4
+        data['ajaxToken'] = token
+        self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+    def goToBuildingByName(self,name):
+        html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+        idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
+        return self.sendRequest(self.config['server']+'build.php?id='+idb+'&newdid='+str(self.vid))
+    
     def villages(self):
         self.minlvl = -1
         for vid in self.config['vids']:
