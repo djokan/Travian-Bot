@@ -8,15 +8,18 @@ import traceback
 from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
-
+doneTasksDelay = {}
 def doOnceInSeconds(delay,function,function_name,*args):
-    if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=delay)<datetime.datetime.now():
+    if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=doneTasksDelay[function_name])<datetime.datetime.now():
         doneTasks[function_name] = datetime.datetime.now()
+        doneTasksDelay[function_name] = delay
         function(*args)
-
 def getRegexValue(stringFrom,regex):
-    idbCompile=re.compile(regex,re.S)
-    return idbCompile.findall(stringFrom)[0]
+    try:
+        idbCompile=re.compile(regex,re.S)
+        return idbCompile.findall(stringFrom)[0]
+    except:
+        return None
 def getFirstMarketplaceData(html):
     data = {}
     names = ["id","t"]
@@ -68,6 +71,9 @@ class travian(object):
                     sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
+    def holdSmallCelebration(self):
+        print('Hold Small Celebration village ' + self.vid)
+        html = self.goToBuildingByName('Town Hall','a=1&')
     def sendResources(self,x,y,r1,r2,r3,r4,sendifNotEnough):
         html = self.goToBuildingByName('Marketplace','t=5&')
         available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\d+)')
@@ -140,6 +146,8 @@ class travian(object):
             self.config['villages'][self.vid]['resource']=dorf1['resource']
             self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
             self.config['villages'][self.vid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+            if 'smallCelebration' in self.config['villages'][vid]:
+                doOnceInSeconds(randint(3000,4000)*3,self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
             if 'requestResourcesFrom' in self.config['villages'][vid]:
                 resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
                 capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
