@@ -6,6 +6,13 @@ import json
 import datetime
 import traceback
 from random import randint
+WAREHOUSECOEFF = 0.8
+doneTasks = {}
+
+def doOnceInSeconds(delay,function,function_name,*args):
+    if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=delay)<datetime.datetime.now():
+        doneTasks[function_name] = datetime.datetime.now()
+        function(*args)
 
 def getRegexValue(stringFrom,regex):
     idbCompile=re.compile(regex,re.S)
@@ -29,6 +36,7 @@ def getSecondMarketplaceData(html):
     return data
 class travian(object):
     def __init__(self):
+        self.RequestedResources = {}
         self.config={}
         self.delay=3
         self.vid=0 #village id
@@ -60,9 +68,30 @@ class travian(object):
                     sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
-    def sendResources(self,x,y,r1,r2,r3,r4):
-        html = self.goToBuildingByName('Marketplace')
+    def sendResources(self,x,y,r1,r2,r3,r4,sendifNotEnough):
+        html = self.goToBuildingByName('Marketplace','t=5&')
+        available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\d+)')
+        available = int(available)
+        cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
+        cancarry = int(cancarry)
+	if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
+            return
+        if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
+            coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
+            r1 = int(int(r1)*coeff)
+            r2 = int(int(r2)*coeff)
+            r3 = int(int(r3)*coeff)
+            r4 = int(int(r4)*coeff)
+            r1 = r1-r1%50
+            r2 = r2-r2%50
+            r3 = r3-r3%50
+            r4 = r4-r4%50
+            r1 = str(r1)
+            r2 = str(r2)
+            r3 = str(r3)
+            r4 = str(r4)
         data = getFirstMarketplaceData(html)
+        print('Sending resources from ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
@@ -79,15 +108,42 @@ class travian(object):
         data['r4'] = r4
         data['ajaxToken'] = token
         self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
-    def goToBuildingByName(self,name):
+    def goToBuildingByName(self,name,linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
-        return self.sendRequest(self.config['server']+'build.php?id='+idb+'&newdid='+str(self.vid))
+        return self.sendRequest(self.config['server']+'build.php?'+linkdata+'id='+idb+'&newdid='+str(self.vid))
     
     def villages(self):
         self.minlvl = -1
         for vid in self.config['vids']:
             self.vid=str(vid)
+            html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
+	    dorf1=self.anlysisDorf1(html)
+	    print(dorf1)
+            self.config['villages'][self.vid]['delay']=dorf1['delay']
+            self.config['villages'][self.vid]['resource']=dorf1['resource']
+            self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
+            self.config['villages'][self.vid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+            if 'requestResourcesFrom' in self.config['villages'][vid]:
+                resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
+                capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
+                send = [0,0,0,0]
+                tempsum = 0
+		for i in range(4):
+                    if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
+		        send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
+                        send[i] = int(send[i])
+                        send[i] = send[i] - send[i]%100
+                    else:
+                        send[i] = 0
+                    tempsum = tempsum + send[i]
+                index = randint(0,len(self.config['villages'][vid]['requestResourcesFrom'])-1)
+                fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
+                timetemp = self.config['villages'][vid]['requestResourcesFromTime'][index]
+                
+                if tempsum>400:
+                    self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
+                #self.requestResourcesIfNeeded()
             try:
                 buildType=self.config['villages'][vid]['buildType']
             except:
@@ -116,6 +172,24 @@ class travian(object):
                 fieldId=int( self.config['villages'][vid]['building'])
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
+        for vid in self.RequestedResources:
+            self.vid=str(vid)
+            resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            tempsum = 0
+            for i in range(4):
+                if (resource[i]<self.RequestedResources[vid][i+1]):
+                    self.RequestedResources[vid][i+1] = resource[i]
+                tempsum = tempsum + self.RequestedResources[vid][i+1]
+            if (tempsum<401):
+                continue
+            to = str(self.RequestedResources[vid][0])
+            r1 = str(self.RequestedResources[vid][1])
+            r2 = str(self.RequestedResources[vid][2])
+            r3 = str(self.RequestedResources[vid][3])
+            r4 = str(self.RequestedResources[vid][4])
+            temptime = self.RequestedResources[vid][5]
+            doOnceInSeconds(temptime,self.sendResources,'sendResources'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
+        self.RequestedResources = {}
 
     def build(self,type):
         try:
@@ -124,13 +198,8 @@ class travian(object):
             delay=0
         if delay > time.time():
             return False
-        html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
-        dorf1=self.anlysisDorf1(html)
-        print(dorf1)
-        self.config['villages'][self.vid]['delay']=dorf1['delay']
-        self.config['villages'][self.vid]['resource']=dorf1['resource']
-        self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
-        self.config['villages'][self.vid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+        
+            
         if type == 'resource':
             #if dorf1['delay'] == 0:
 
