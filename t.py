@@ -80,7 +80,7 @@ class travian(object):
         available = int(available)
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
-        
+        print('AVAILABLE:' + str(available))
 	if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
@@ -93,8 +93,6 @@ class travian(object):
             r2 = r2-r2%50
             r3 = r3-r3%50
             r4 = r4-r4%50
-            if r1+r2+r3+r4<401:
-                return
             r1 = str(r1)
             r2 = str(r2)
             r3 = str(r3)
@@ -110,6 +108,7 @@ class travian(object):
             if tempp%4==3 and int(r4)>50:
                 r4 = str(int(r4)-50)
             tempp = tempp+1
+        print('Trying to send ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<401:
             return
         data = getFirstMarketplaceData(html)
@@ -123,13 +122,16 @@ class travian(object):
         data['dname'] = ''
         token = data['ajaxToken']
         html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        print('MarketDebugInfo:')
+        print(html)
         data = getSecondMarketplaceData(html)
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
         data['r4'] = r4
         data['ajaxToken'] = token
-        self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        print('MarketDebugInfo2:')
+        print(self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data))
     def goToBuildingByName(self,name,linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
@@ -140,14 +142,9 @@ class travian(object):
         for vid in self.config['vids']:
             self.vid=str(vid)
             html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
-	    dorf1=self.anlysisDorf1(html)
-	    print(dorf1)
-            self.config['villages'][self.vid]['delay']=dorf1['delay']
-            self.config['villages'][self.vid]['resource']=dorf1['resource']
-            self.config['villages'][self.vid]['fieldsList']=dorf1['fieldsList']
-            self.config['villages'][self.vid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+            dorf1=self.config['villages'][self.vid]
             if 'smallCelebration' in self.config['villages'][vid]:
-                doOnceInSeconds(randint(3000,4000)*3,self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
+                doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
             if 'requestResourcesFrom' in self.config['villages'][vid]:
                 resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
                 capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
@@ -197,6 +194,7 @@ class travian(object):
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
         for vid in self.RequestedResources:
+            print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
             resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             tempsum = 0
@@ -204,6 +202,7 @@ class travian(object):
                 if (resource[i]<self.RequestedResources[vid][i+1]):
                     self.RequestedResources[vid][i+1] = resource[i]
                 tempsum = tempsum + self.RequestedResources[vid][i+1]
+            print('Trying to send' + str(self.RequestedResources[vid]))
             if (tempsum<401):
                 continue
             to = str(self.RequestedResources[vid][0])
@@ -212,6 +211,7 @@ class travian(object):
             r3 = str(self.RequestedResources[vid][3])
             r4 = str(self.RequestedResources[vid][4])
             temptime = self.RequestedResources[vid][5]
+
             doOnceInSeconds(temptime,self.sendResources,'sendResources'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
         self.RequestedResources = {}
 
@@ -325,10 +325,67 @@ class travian(object):
         if minLevelKey < 18: #it always less then 18
             return minLevelKey+1;
         return False;
-
+    def analysisBuild(self,html):
+        build={}
+        if not html:
+            return False
+        parser = BeautifulSoup(html, "html5lib")
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
+        prs = productionCompile.findall(html)
+        for i in range(len(prs)):
+            build['stockBarFreeCrop']=int(prs[i].replace(".",""))
+        productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
+        prs = productionCompile.findall(html)
+        for i in range(len(prs)):
+            prs[i]=int(prs[i])
+        
+        build['resource'] =prs
+        isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
+        build['delay']=0
+        if isUnderConstruction == None:
+            underConstruction=False
+        else:
+            underConstruction=True
+            timer1=parser.find('span',{'id':'timer1'})
+            try:
+                timer1a=timer1.text.split(':')
+                #delay for current building
+                build['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
+            except:
+                pass
+        return build
     def analysisDorf2(self,html):
-        return False
-    def anlysisDorf1(self,html):
+        dorf2={}
+        if not html:
+            return False
+        parser = BeautifulSoup(html, "html5lib")
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
+        prs = productionCompile.findall(html)
+        for i in range(len(prs)):
+            dorf2['stockBarFreeCrop']=int(prs[i].replace(".",""))
+        productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
+        prs = productionCompile.findall(html)
+        for i in range(len(prs)):
+            prs[i]=int(prs[i])
+        
+        dorf2['resource'] =prs
+        isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
+
+
+        dorf2['delay']=0
+        if isUnderConstruction == None:
+            underConstruction=False
+        else:
+            underConstruction=True
+            timer1=parser.find('span',{'id':'timer1'})
+            try:
+                timer1a=timer1.text.split(':')
+                #delay for current building
+                dorf2['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
+            except:
+                pass
+        return dorf2
+    def analysisDorf1(self,html):
         dorf1={}
         if not html:
             return False
@@ -345,10 +402,10 @@ class travian(object):
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
         
-        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;(\d*)')
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
-            dorf1['stockBarFreeCrop']=int(prs[i])
+            dorf1['stockBarFreeCrop']=int(prs[i].replace(".",""))
         productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
@@ -456,7 +513,7 @@ class travian(object):
         self.config['y']=y
         self.config['nation']=nation
         self.config['ajaxToken']=ajaxToken
-        print(self.config)
+        #print(self.config)
         #self.saveConfig()
     def getVillages(self):
         pass
@@ -504,6 +561,27 @@ class travian(object):
                         #log.error('Could not relogin %d time' %reconnects)
                         print(('Could not relogin %d time' %reconnects))
                         time.sleep(self.delay)
+        temphtml = html.text
+        if 'newdid=' in url:
+            tempvid = getRegexValue(url,'newdid=(\d+)')
+            if 'dorf1.php' in url:
+                dorf1 = self.analysisDorf1(temphtml)
+                self.config['villages'][tempvid]['delay']=dorf1['delay']
+                self.config['villages'][tempvid]['resource']=dorf1['resource']
+                self.config['villages'][tempvid]['fieldsList']=dorf1['fieldsList']
+                self.config['villages'][tempvid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+            if 'dorf2.php' in url:
+                dorf2 = self.analysisDorf2(temphtml)
+                self.config['villages'][tempvid]['delay']=dorf2['delay']
+                self.config['villages'][tempvid]['resource']=dorf2['resource']
+                self.config['villages'][tempvid]['stockBarFreeCrop']=dorf2['stockBarFreeCrop']
+            if 'build.php' in url:
+                build = self.analysisBuild(temphtml)
+                self.config['villages'][tempvid]['delay']=build['delay']
+                self.config['villages'][tempvid]['resource']=build['resource']
+                self.config['villages'][tempvid]['stockBarFreeCrop']=build['stockBarFreeCrop']
+                
+
         return html.text
 
 travian();
