@@ -94,14 +94,14 @@ class travian(object):
             r3 = str(r3)
             r4 = str(r4)
         tempp = 0
-        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 or int(r1)+int(r2)+int(r3)+int(r4)<401:
-            if tempp%4==0:
+        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 and int(r1)+int(r2)+int(r3)+int(r4)>400:
+            if tempp%4==0 and int(r1)>50:
                 r1 = str(int(r1)-50)
-            if tempp%4==1:
+            if tempp%4==1 and int(r2)>50:
                 r2 = str(int(r2)-50)
-            if tempp%4==2:
+            if tempp%4==2 and int(r3)>50:
                 r3 = str(int(r3)-50)
-            if tempp%4==3:
+            if tempp%4==3 and int(r4)>50:
                 r4 = str(int(r4)-50)
             tempp = tempp+1
         if int(r1)+int(r2)+int(r3)+int(r4)<401:
