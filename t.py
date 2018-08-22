@@ -74,6 +74,7 @@ class travian(object):
         available = int(available)
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
+        
 	if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
@@ -92,6 +93,19 @@ class travian(object):
             r2 = str(r2)
             r3 = str(r3)
             r4 = str(r4)
+        tempp = 0
+        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 or int(r1)+int(r2)+int(r3)+int(r4)<401:
+            if tempp%4==0:
+                r1 = str(int(r1)-50)
+            if tempp%4==1:
+                r2 = str(int(r2)-50)
+            if tempp%4==2:
+                r3 = str(int(r3)-50)
+            if tempp%4==3:
+                r4 = str(int(r4)-50)
+            tempp = tempp+1
+        if int(r1)+int(r2)+int(r3)+int(r4)<401:
+            return
         data = getFirstMarketplaceData(html)
         print('Sending resources from ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
         data['r1'] = r1
