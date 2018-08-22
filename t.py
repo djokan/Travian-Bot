@@ -86,6 +86,8 @@ class travian(object):
             r2 = r2-r2%50
             r3 = r3-r3%50
             r4 = r4-r4%50
+            if r1+r2+r3+r4<401:
+                return
             r1 = str(r1)
             r2 = str(r2)
             r3 = str(r3)
@@ -131,7 +133,7 @@ class travian(object):
                 tempsum = 0
 		for i in range(4):
                     if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
-		        send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
+                        send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
                         send[i] = int(send[i])
                         send[i] = send[i] - send[i]%100
                     else:
