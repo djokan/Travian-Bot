@@ -27,7 +27,8 @@ def getFirstMarketplaceData(html):
         data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
     data['cmd']='prepareMarketplace'
     data['x2']='1'
-    data['ajaxToken']=getRegexValue(html,'contraceptiveBluebottles.+return \'([a-z\d]+)\';')
+    data['ajaxToken']=getRegexValue(html,'return \'([a-z\d]{32})\';')
+    print data['ajaxToken'];
     return data
 def getSecondMarketplaceData(html):
     data = {}
@@ -121,6 +122,8 @@ class travian(object):
         data['y'] = y
         data['dname'] = ''
         token = data['ajaxToken']
+        print(html)
+        print(token)
         html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
         print('MarketDebugInfo:')
         print(html)
