@@ -20,6 +20,12 @@ def getRegexValue(stringFrom,regex):
         return idbCompile.findall(stringFrom)[0]
     except:
         return None
+def getAdventureData(html):
+    data = {}
+    names = ["send","kid","from","a"]
+    for name in names:
+        data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
+    return data
 def getFirstMarketplaceData(html):
     data = {}
     names = ["id","t"]
@@ -28,7 +34,6 @@ def getFirstMarketplaceData(html):
     data['cmd']='prepareMarketplace'
     data['x2']='1'
     data['ajaxToken']=getRegexValue(html,'return \'([a-z\d]{32})\';')
-    print data['ajaxToken'];
     return data
 def getSecondMarketplaceData(html):
     data = {}
@@ -122,30 +127,47 @@ class travian(object):
         data['y'] = y
         data['dname'] = ''
         token = data['ajaxToken']
-        print(html)
-        print(token)
         html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
-        print('MarketDebugInfo:')
-        print(html)
+        oldhtml = html
         data = getSecondMarketplaceData(html)
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
         data['r4'] = r4
         data['ajaxToken'] = token
-        print('MarketDebugInfo2:')
-        print(self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data))
+        html=self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        if not 'Resources have been dispatched' in html:
+            print('MarketDebugInfo:')
+            print(oldhtml)
+            print('MarketDebugInfo2:')
+            print(html)
     def goToBuildingByName(self,name,linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
         return self.sendRequest(self.config['server']+'build.php?'+linkdata+'id='+idb+'&newdid='+str(self.vid))
-    
+    def autoAdventure(self):
+        print('Starting adventure')
+        html=self.sendRequest(self.config['server']+'hero.php?t=3')
+        link = getRegexValue(html,'href="([^"]+)">To the adventure')
+        if link==None:
+            return
+        link = link.replace("&amp;","&")
+        print(link)
+        html=self.sendRequest(self.config['server']+link)
+        data=getAdventureData(html)
+        for key in data:
+            if data[key]==None:
+                return
+        print(data)
+        html=self.sendRequest(self.config['server']+'start_adventure.php',data)
     def villages(self):
         self.minlvl = -1
         for vid in self.config['vids']:
             self.vid=str(vid)
             html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
             dorf1=self.config['villages'][self.vid]
+            if self.adventureExists and 'autoAdventure' in self.config:
+                doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
             if 'smallCelebration' in self.config['villages'][vid]:
                 doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
             if 'requestResourcesFrom' in self.config['villages'][vid]:
@@ -172,7 +194,7 @@ class travian(object):
                 buildType=self.config['villages'][vid]['buildType']
             except:
                 self.config['villages'][vid]={}
-                buildType='resource'
+                buildType='0'
             print('Village: '+str(vid)+' build type:'+buildType)
             if buildType == '0':
                 pass
@@ -200,6 +222,11 @@ class travian(object):
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
             resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            if 'holdResources' in self.config['villages'][vid]:
+                for i in range(4):
+                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]
+                    if resource[i]<0:
+                        resource[i]=0
             tempsum = 0
             for i in range(4):
                 if (resource[i]<self.RequestedResources[vid][i+1]):
@@ -404,7 +431,9 @@ class travian(object):
             level=fieldsList[i][len(fieldsList[i])-1].replace('level','')
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
-        
+        self.adventureExists = False
+        if 'class="speechBubbleContainer' in html:
+            self.adventureExists = True
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
@@ -543,7 +572,6 @@ class travian(object):
         except:
             print('Net problem, cant fetch the URL'+url)
             return False
-
 
 
         if self.loggedIn and not 'ajax.php' in url and not self.config['server']==url:
