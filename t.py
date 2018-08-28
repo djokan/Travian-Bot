@@ -77,6 +77,12 @@ class travian(object):
                     sleepDelay = randint(500,800)
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
+    def getMinMarketTreshold(self):
+        minMarketTreshold= 400
+        if 'minMarketTreshold' in self.config:
+            minMarketTreshold = self.config['minMarketTreshold']
+        return minMarketTreshold
+
     def holdSmallCelebration(self):
         print('Hold Small Celebration village ' + self.vid)
         html = self.goToBuildingByName('Town Hall','a=1&')
@@ -104,7 +110,8 @@ class travian(object):
             r3 = str(r3)
             r4 = str(r4)
         tempp = 0
-        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 and int(r1)+int(r2)+int(r3)+int(r4)>400:
+        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
+            print(r1+','+r2+','+r3+','+r4)
             if tempp%4==0 and int(r1)>50:
                 r1 = str(int(r1)-50)
             if tempp%4==1 and int(r2)>50:
@@ -115,7 +122,8 @@ class travian(object):
                 r4 = str(int(r4)-50)
             tempp = tempp+1
         print('Trying to send ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
-        if int(r1)+int(r2)+int(r3)+int(r4)<401:
+        print('a ' + str(int(r1)+int(r2)+int(r3)+int(r4)) + ' ' + str(self.getMinMarketTreshold()))
+        if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
             return
         data = getFirstMarketplaceData(html)
         print('Sending resources from ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
@@ -127,7 +135,8 @@ class travian(object):
         data['y'] = y
         data['dname'] = ''
         token = data['ajaxToken']
-        html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        olddata= data
+        html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         oldhtml = html
         data = getSecondMarketplaceData(html)
         data['r1'] = r1
@@ -135,12 +144,14 @@ class travian(object):
         data['r3'] = r3
         data['r4'] = r4
         data['ajaxToken'] = token
-        html=self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace&newdid='+str(self.vid),data)
+        html=self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         if not 'Resources have been dispatched' in html:
             print('MarketDebugInfo:')
             print(oldhtml)
+            print(olddata)
             print('MarketDebugInfo2:')
             print(html)
+            print(data)
     def goToBuildingByName(self,name,linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
@@ -187,7 +198,7 @@ class travian(object):
                 fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
                 timetemp = self.config['villages'][vid]['requestResourcesFromTime'][index]
                 
-                if tempsum>400:
+                if tempsum>self.getMinMarketTreshold():
                     self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
                 #self.requestResourcesIfNeeded()
             try:
@@ -207,10 +218,19 @@ class travian(object):
                 fieldId=int( self.config['villages'][vid]['building'])
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
+                if 'building2' in self.config['villages'][vid]:
+                    tempDelay = randint(5,15)
+                    print('sleeping for ' + str(tempDelay) + " seconds")
+                    time.sleep(tempDelay)
+                    print('Start to build other building '+ str(self.config['villages'][vid]['building2']))
+                    #self.config['villages'][vid]['building']
+                    fieldId=int( self.config['villages'][vid]['building2'])
+                    if fieldId > 0:
+                        self.buildBuilding(fieldId)
             elif buildType == 'both':
                 print('Start min Resource Building')
                 self.build('resource')
-                tempDelay = randint(5,15)
+                tempDelay = randint(3,7)
                 print('sleeping for ' + str(tempDelay) + " seconds")
                 time.sleep(tempDelay)
                 print('Start to build building '+ str(self.config['villages'][vid]['building']))
@@ -218,6 +238,15 @@ class travian(object):
                 fieldId=int( self.config['villages'][vid]['building'])
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
+                if 'building2' in self.config['villages'][vid]:
+                    tempDelay = randint(3,7)
+                    print('sleeping for ' + str(tempDelay) + " seconds")
+                    time.sleep(tempDelay)
+                    print('Start to build other building '+ str(self.config['villages'][vid]['building2']))
+                    #self.config['villages'][vid]['building']
+                    fieldId=int( self.config['villages'][vid]['building2'])
+                    if fieldId > 0:
+                        self.buildBuilding(fieldId)
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
@@ -230,10 +259,10 @@ class travian(object):
             tempsum = 0
             for i in range(4):
                 if (resource[i]<self.RequestedResources[vid][i+1]):
-                    self.RequestedResources[vid][i+1] = resource[i]
+                    self.RequestedResources[vid][i+1] = resource[i]-resource[i]%50
                 tempsum = tempsum + self.RequestedResources[vid][i+1]
             print('Trying to send' + str(self.RequestedResources[vid]))
-            if (tempsum<401):
+            if (tempsum<self.getMinMarketTreshold()):
                 continue
             to = str(self.RequestedResources[vid][0])
             r1 = str(self.RequestedResources[vid][1])
