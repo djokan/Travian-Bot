@@ -183,6 +183,7 @@ class travian(object):
                 doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
             if 'requestResourcesFrom' in self.config['villages'][vid]:
                 resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
+                print(dorf1['resource'])
                 capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
                 send = [0,0,0,0]
                 tempsum = 0
@@ -393,7 +394,7 @@ class travian(object):
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             build['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
+        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             prs[i]=int(prs[i])
@@ -422,7 +423,7 @@ class travian(object):
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             dorf2['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
+        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             prs[i]=int(prs[i])
@@ -467,7 +468,7 @@ class travian(object):
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             dorf1['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?[1-9]\d*)')
+        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             prs[i]=int(prs[i])
