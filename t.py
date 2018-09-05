@@ -60,6 +60,20 @@ class travian(object):
                 if self.loggedIn==False:
                     self.login()
                 self.villages()
+                woodpro=0
+                claypro=0
+                ironpro=0
+                croppro=0
+                allpro=0
+                for vid in self.config['vids']:
+                    self.vid=str(vid)
+                    dorf1=self.config['villages'][self.vid]
+                    resource = resource=[dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
+                    woodpro+=resource[0]
+                    claypro+=resource[1]
+                    ironpro+=resource[2]
+                    croppro+=resource[3]
+                allpro+=woodpro+claypro+ironpro+croppro
                 self.getConfigViaTemp()
             except Exception as e:
                 print(traceback.format_exc())
@@ -75,6 +89,8 @@ class travian(object):
                     sleepDelay = randint(300,500)
                 else:
                     sleepDelay = randint(500,800)
+            
+            print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
     def getMinMarketTreshold(self):
