@@ -81,14 +81,14 @@ class travian(object):
                 time.sleep(30)
                 continue
             if self.minlvl == -1:
-                sleepDelay = randint(500,800)
+                sleepDelay = randint(3000,5000)
             else:
                 if self.minlvl<4:
-                    sleepDelay = randint(100,300)
+                    sleepDelay = randint(3000,5000)
                 elif self.minlvl<6:
-                    sleepDelay = randint(300,500)
+                    sleepDelay = randint(3000,5000)
                 else:
-                    sleepDelay = randint(500,800)
+                    sleepDelay = randint(3000,5000)
             
             print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
@@ -270,7 +270,7 @@ class travian(object):
             resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
-                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]
+                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
                     if resource[i]<0:
                         resource[i]=0
             tempsum = 0
