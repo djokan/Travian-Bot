@@ -80,16 +80,19 @@ class travian(object):
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
+            sleep=False
+            now = datetime.datetime.now()
+            if now.hour<randint(8,10) and now.hour >= randint(0,2):
+                sleep=True
             if self.minlvl == -1:
-                sleepDelay = randint(3000,5000)
+                sleepDelay = randint(1500,4000)
             else:
-                if self.minlvl<4:
-                    sleepDelay = randint(3000,5000)
-                elif self.minlvl<6:
-                    sleepDelay = randint(3000,5000)
+                if self.minlvl<3:
+                    sleepDelay = randint(600,2500)
                 else:
-                    sleepDelay = randint(3000,5000)
-            
+                    sleepDelay = randint(1500,4000)
+            if sleep:
+                sleepDelay = randint(9000,15000)
             print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
@@ -230,47 +233,37 @@ class travian(object):
                 print('Start min Resource Building')
                 self.build('resource')
             elif buildType == 'building':
-                print('Start to build building '+ str(self.config['villages'][vid]['building']))
+		bid = self.config['villages'][vid]['building']
+                if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                    bid = self.config['villages'][vid]['building2']
+                print('Start to build building '+ str(bid))
                 #self.config['villages'][vid]['building']
-                fieldId=int( self.config['villages'][vid]['building'])
+                fieldId=int( bid)
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
-                if 'building2' in self.config['villages'][vid]:
-                    tempDelay = randint(5,15)
-                    print('sleeping for ' + str(tempDelay) + " seconds")
-                    time.sleep(tempDelay)
-                    print('Start to build other building '+ str(self.config['villages'][vid]['building2']))
-                    #self.config['villages'][vid]['building']
-                    fieldId=int( self.config['villages'][vid]['building2'])
-                    if fieldId > 0:
-                        self.buildBuilding(fieldId)
             elif buildType == 'both':
                 print('Start min Resource Building')
                 self.build('resource')
                 tempDelay = randint(3,7)
                 print('sleeping for ' + str(tempDelay) + " seconds")
                 time.sleep(tempDelay)
-                print('Start to build building '+ str(self.config['villages'][vid]['building']))
-                #self.config['villages'][vid]['building']
-                fieldId=int( self.config['villages'][vid]['building'])
+                bid = self.config['villages'][vid]['building']
+                if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                    bid = self.config['villages'][vid]['building2']
+                print('Start to build building '+ str(bid))
+                fieldId=int( bid)
                 if fieldId > 0:
                     self.buildBuilding(fieldId)
-                if 'building2' in self.config['villages'][vid]:
-                    tempDelay = randint(3,7)
-                    print('sleeping for ' + str(tempDelay) + " seconds")
-                    time.sleep(tempDelay)
-                    print('Start to build other building '+ str(self.config['villages'][vid]['building2']))
-                    #self.config['villages'][vid]['building']
-                    fieldId=int( self.config['villages'][vid]['building2'])
-                    if fieldId > 0:
-                        self.buildBuilding(fieldId)
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
             resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
+                    tmprs = resource[i]
                     resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
+                    if tmprs<resource[i]:
+                        resource[i]=tmprs
                     if resource[i]<0:
                         resource[i]=0
             tempsum = 0
