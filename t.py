@@ -80,16 +80,21 @@ class travian(object):
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
                 continue
+            now = datetime.datetime.now()
+            sleeptime=False
+            if now.hour>randint(0,2) and now.hour<randint(6,8):
+                sleeptime=True
             if self.minlvl == -1:
                 sleepDelay = randint(500,800)
             else:
-                if self.minlvl<4:
-                    sleepDelay = randint(100,300)
+                if self.minlvl<3:
+                    sleepDelay = randint(600,1200)
                 elif self.minlvl<6:
-                    sleepDelay = randint(300,500)
+                    sleepDelay = randint(1800,3600)
                 else:
-                    sleepDelay = randint(500,800)
-            
+                    sleepDelay = randint(1800,3600)
+            if sleeptime:
+                sleepDelay = randint(10800,21600)
             print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
@@ -197,6 +202,10 @@ class travian(object):
                 doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
             if 'smallCelebration' in self.config['villages'][vid]:
                 doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
+            if 'push' in self.config['villages'][vid]:
+                temppush=self.config['villages'][vid]['push']
+                temppushparams=self.config['villages'][vid]['pushparams']
+                doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
             if 'requestResourcesFrom' in self.config['villages'][vid]:
                 resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
                 print(dorf1['resource'])
