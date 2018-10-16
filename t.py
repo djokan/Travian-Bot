@@ -79,6 +79,7 @@ class travian(object):
                 print(traceback.format_exc())
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
+                self.getConfigViaTemp()
                 continue
             now = datetime.datetime.now()
             sleeptime=False
@@ -217,17 +218,19 @@ class travian(object):
 		for i in range(4):
                     if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
                         send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
-                        send[i] = int(send[i])
+                        send[i] = int(send[i])/len(self.config['villages'][vid]['requestResourcesFrom'])
                         send[i] = send[i] - send[i]%100
                     else:
                         send[i] = 0
                     tempsum = tempsum + send[i]
-                index = randint(0,len(self.config['villages'][vid]['requestResourcesFrom'])-1)
-                fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
-                timetemp = self.config['villages'][vid]['requestResourcesFromTime'][index]
-                
-                if tempsum>self.getMinMarketTreshold():
-                    self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
+                timetemp = self.config['villages'][vid]['requestResourcesFromTime'][0]
+                for i in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
+                    if timetemp<self.config['villages'][vid]['requestResourcesFromTime'][i]:
+                        timetemp = self.config['villages'][vid]['requestResourcesFromTime'][i]
+                for index in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
+                    fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
+                    if tempsum>self.getMinMarketTreshold():
+                        self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
                 #self.requestResourcesIfNeeded()
             try:
                 buildType=self.config['villages'][vid]['buildType']
@@ -252,6 +255,19 @@ class travian(object):
             elif buildType == 'both':
                 print('Start min Resource Building')
                 self.build('resource')
+                tempDelay = randint(3,7)
+                print('sleeping for ' + str(tempDelay) + " seconds")
+                time.sleep(tempDelay)
+                bid = self.config['villages'][vid]['building']
+                if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                    bid = self.config['villages'][vid]['building2']
+                print('Start to build building '+ str(bid))
+                fieldId=int( bid)
+                if fieldId > 0:
+                    self.buildBuilding(fieldId)
+            elif buildType == '15c':
+                print('Start min Resource Building')
+                self.build('15c')
                 tempDelay = randint(3,7)
                 print('sleeping for ' + str(tempDelay) + " seconds")
                 time.sleep(tempDelay)
@@ -289,7 +305,7 @@ class travian(object):
             r4 = str(self.RequestedResources[vid][4])
             temptime = self.RequestedResources[vid][5]
 
-            doOnceInSeconds(temptime,self.sendResources,'sendResources'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
+            doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.vid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
         self.RequestedResources = {}
 
     def build(self,type):
@@ -299,7 +315,11 @@ class travian(object):
             delay=0
         if delay > time.time():
             return False
-        
+
+        if type == '15c':
+            fieldId=self.buildFindMinFieldCrop()
+            if fieldId:
+                self.buildBuilding(fieldId)
             
         if type == 'resource':
             #if dorf1['delay'] == 0:
@@ -431,6 +451,47 @@ class travian(object):
             except:
                 pass
         return build
+    def buildFindMinFieldCrop(self):
+        dorf1=self.config['villages'][self.vid]
+        resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
+        fieldsList=dorf1['fieldsList']
+        newFieldsList={}
+        notTopGidsList=[]
+        minlvl = 30
+        for i in range(len(fieldsList)):
+            if fieldsList[i]['level'] < minlvl:
+                minlvl = fieldsList[i]['level']
+        if self.minlvl == -1 or self.minlvl>minlvl:
+            self.minlvl = minlvl
+        for i in range(len(fieldsList)):
+            newFieldsList[i]=fieldsList[i];
+            if fieldsList[i]['gid'] not in notTopGidsList:
+                notTopGidsList.append(fieldsList[i]['gid'])
+
+        #the resource list removed the all 10 level
+        newResource={}
+        minResourceWithoutTop=999999999999999
+        minResourceWithoutTopKey=999999999999999  #always less then 5
+        for i in range(len(resource)):
+            if i+1 in notTopGidsList:
+                if(resource[i]<minResourceWithoutTop):
+                    minResourceWithoutTop=resource[i]
+                    minResourceWithoutTopKey=i+1
+        if minResourceWithoutTopKey > 5:
+            return False
+        minResourceWithoutTopKey = 4
+        minLevel=999999999999
+        minLevelKey=99999999999
+
+        for i in newFieldsList:
+            if newFieldsList[i]['gid'] == minResourceWithoutTopKey:
+                if newFieldsList[i]['level'] <minLevel:
+                    minLevel= newFieldsList[i]['level']
+                    minLevelKey=i
+
+        if minLevelKey < 18: #it always less then 18
+            return minLevelKey+1;
+        return False;
     def analysisDorf2(self,html):
         dorf2={}
         if not html:
@@ -573,23 +634,12 @@ class travian(object):
         villageAmount = len(villageVids)
         nationCompile=re.compile('nation(\d)')
         nation = nationCompile.findall(html)[0]
-        xCompile=re.compile('coordinateX&quot;&gt;\(&amp;#x202d;(-?\d+)')
-        X = xCompile.findall( html)
-        yCompile=re.compile('coordinateY&quot;&gt;&amp;#x202d;(-?\d+)')
-        Y = yCompile.findall( html)
         ajaxTokenCompile=re.compile('ajaxToken\s*=\s*\'(\w+)\'')
         ajaxToken = ajaxTokenCompile.findall( html)[0]
-        x = []
-        y = []
-        for i in range(villageAmount):
-            x.append(X[i])
-            y.append(Y[i])
         self.config['villagesAmount']=villageAmount
         self.config['vids'] = []
         for vid in self.config['villages']:
 	    self.config['vids'].append(vid) 
-        self.config['x']=x
-        self.config['y']=y
         self.config['nation']=nation
         self.config['ajaxToken']=ajaxToken
         #print(self.config)
