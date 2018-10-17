@@ -202,7 +202,7 @@ class travian(object):
             self.vid=str(vid)
             t=10
             if self.vid in self.villageCheckPeriod:
-                t=self.villageCheckPeriod
+                t=self.villageCheckPeriod[self.vid]
             doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid,vid)
         self.villagesSendResources()
     def checkVillage(self,vid):
