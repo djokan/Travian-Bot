@@ -214,7 +214,7 @@ class travian(object):
             doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
         if 'push' in self.config['villages'][self.vid]:
             temppush=self.config['villages'][self.vid]['push']
-            temppushparams=self.config['villages'][vid]['pushparams']
+            temppushparams=self.config['villages'][self.vid]['pushparams']
             doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][self.vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
