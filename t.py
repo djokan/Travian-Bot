@@ -202,21 +202,21 @@ class travian(object):
             self.vid=str(vid)
             t=10
             if self.vid in self.villageCheckPeriod:
-                t=self.villageCheckPeriod[self.vid]
-            doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid)
+                t=self.villageCheckPeriod
+            doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid,vid)
         self.villagesSendResources()
-    def checkVillage(self):
+    def checkVillage(self,vid):
         html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
         dorf1=self.config['villages'][self.vid]
         if self.adventureExists and 'autoAdventure' in self.config:
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
-        if 'smallCelebration' in self.config['villages'][self.vid]:
+        if 'smallCelebration' in self.config['villages'][vid]:
             doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
-        if 'push' in self.config['villages'][self.vid]:
-            temppush=self.config['villages'][self.vid]['push']
-            temppushparams=self.config['villages'][self.vid]['pushparams']
+        if 'push' in self.config['villages'][vid]:
+            temppush=self.config['villages'][vid]['push']
+            temppushparams=self.config['villages'][vid]['pushparams']
             doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
-        if 'requestResourcesFrom' in self.config['villages'][self.vid]:
+        if 'requestResourcesFrom' in self.config['villages'][vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
             print(dorf1['resource'])
             capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
@@ -225,37 +225,37 @@ class travian(object):
             for i in range(4):
                 if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
                     send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
-                    send[i] = int(send[i])/len(self.config['villages'][self.vid]['requestResourcesFrom'])
+                    send[i] = int(send[i])/len(self.config['villages'][vid]['requestResourcesFrom'])
                     send[i] = send[i] - send[i]%100
                 else:
                     send[i] = 0
                 tempsum = tempsum + send[i]
-            timetemp = self.config['villages'][self.vid]['requestResourcesFromTime'][0]
-            for i in range(len(self.config['villages'][self.vid]['requestResourcesFrom'])):
-                if timetemp<self.config['villages'][self.vid]['requestResourcesFromTime'][i]:
-                    timetemp = self.config['villages'][self.vid]['requestResourcesFromTime'][i]
-            for index in range(len(self.config['villages'][self.vid]['requestResourcesFrom'])):
-                fromtemp = self.config['villages'][self.vid]['requestResourcesFrom'][index]
+            timetemp = self.config['villages'][vid]['requestResourcesFromTime'][0]
+            for i in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
+                if timetemp<self.config['villages'][vid]['requestResourcesFromTime'][i]:
+                    timetemp = self.config['villages'][vid]['requestResourcesFromTime'][i]
+            for index in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
+                fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
                 if tempsum>self.getMinMarketTreshold():
-                    self.RequestedResources[fromtemp] = [self.vid,send[0],send[1],send[2],send[3],timetemp]
+                    self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
             #self.requestResourcesIfNeeded()
         try:
-            buildType=self.config['villages'][self.vid]['buildType']
+            buildType=self.config['villages'][vid]['buildType']
         except:
-            self.config['villages'][self.vid]={}
+            self.config['villages'][vid]={}
             buildType='0'
-        print('Village: '+self.vid+' build type:'+buildType)
+        print('Village: '+str(vid)+' build type:'+buildType)
         if buildType == '0':
             pass
         elif buildType == 'resource':
             print('Start min Resource Building')
             self.build('resource')
         elif buildType == 'building':
-            bid = self.config['villages'][self.vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][self.vid]:
-                bid = self.config['villages'][self.vid]['building2']
+            bid = self.config['villages'][vid]['building']
+            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                bid = self.config['villages'][vid]['building2']
             print('Start to build building '+ str(bid))
-            #self.config['villages'][self.vid]['building']
+            #self.config['villages'][vid]['building']
             fieldId=int( bid)
             if fieldId > 0:
                 self.buildBuilding(fieldId)
@@ -265,9 +265,9 @@ class travian(object):
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = self.config['villages'][self.vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][self.vid]:
-                bid = self.config['villages'][self.vid]['building2']
+            bid = self.config['villages'][vid]['building']
+            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                bid = self.config['villages'][vid]['building2']
             print('Start to build building '+ str(bid))
             fieldId=int( bid)
             if fieldId > 0:
@@ -278,9 +278,9 @@ class travian(object):
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = self.config['villages'][self.vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][self.vid]:
-                bid = self.config['villages'][self.vid]['building2']
+            bid = self.config['villages'][vid]['building']
+            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
+                bid = self.config['villages'][vid]['building2']
             print('Start to build building '+ str(bid))
             fieldId=int( bid)
             if fieldId > 0:
@@ -289,29 +289,29 @@ class travian(object):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
-            resource=[self.config['villages'][self.vid]['resource'][4],self.config['villages'][self.vid]['resource'][5],self.config['villages'][self.vid]['resource'][6],self.config['villages'][self.vid]['resource'][7]]
-            if 'holdResources' in self.config['villages'][self.vid]:
+            resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
                     tmprs = resource[i]
-                    resource[i]= resource[i]-self.config['villages'][self.vid]['holdResources'][i]+ randint(1,2000)-1000
+                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
                     if tmprs<resource[i]:
                         resource[i]=tmprs
                     if resource[i]<0:
                         resource[i]=0
             tempsum = 0
             for i in range(4):
-                if (resource[i]<self.RequestedResources[self.vid][i+1]):
-                    self.RequestedResources[self.vid][i+1] = resource[i]-resource[i]%50
-                tempsum = tempsum + self.RequestedResources[self.vid][i+1]
-            print('Trying to send' + str(self.RequestedResources[self.vid]))
+                if (resource[i]<self.RequestedResources[vid][i+1]):
+                    self.RequestedResources[vid][i+1] = resource[i]-resource[i]%50
+                tempsum = tempsum + self.RequestedResources[vid][i+1]
+            print('Trying to send' + str(self.RequestedResources[vid]))
             if (tempsum<self.getMinMarketTreshold()):
                 continue
-            to = str(self.RequestedResources[self.vid][0])
-            r1 = str(self.RequestedResources[self.vid][1])
-            r2 = str(self.RequestedResources[self.vid][2])
-            r3 = str(self.RequestedResources[self.vid][3])
-            r4 = str(self.RequestedResources[self.vid][4])
-            temptime = self.RequestedResources[self.vid][5]
+            to = str(self.RequestedResources[vid][0])
+            r1 = str(self.RequestedResources[vid][1])
+            r2 = str(self.RequestedResources[vid][2])
+            r3 = str(self.RequestedResources[vid][3])
+            r4 = str(self.RequestedResources[vid][4])
+            temptime = self.RequestedResources[vid][5]
 
             doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.vid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
         self.RequestedResources = {}
