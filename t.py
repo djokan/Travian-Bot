@@ -69,7 +69,12 @@ class travian(object):
                 for vid in self.config['vids']:
                     self.vid=str(vid)
                     dorf1=self.config['villages'][self.vid]
-                    resource = resource=[dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
+                    resource=None
+                    try:
+                        resource = [dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
+                    except Exception as e:
+                        self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+                        resource = [dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
                     woodpro+=resource[0]
                     claypro+=resource[1]
                     ironpro+=resource[2]
@@ -289,7 +294,12 @@ class travian(object):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.vid=str(vid)
-            resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            resource=None
+            try:
+                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            except Exception as e:
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
                     tmprs = resource[i]
