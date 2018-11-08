@@ -80,7 +80,7 @@ class travian(object):
                     ironpro+=resource[2]
                     croppro+=resource[3]
                 allpro+=woodpro+claypro+ironpro+croppro
-                self.getConfigViaTemp()
+                
             except Exception as e:
                 print(traceback.format_exc())
                 print('Waiting for internet connection (30 sec)')
@@ -107,6 +107,10 @@ class travian(object):
             print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             time.sleep(sleepDelay)
+            try:
+                self.getConfigViaTemp()
+            except Exception as e:
+                useless=3
     def getMinMarketTreshold(self):
         minMarketTreshold= 400
         if 'minMarketTreshold' in self.config:
