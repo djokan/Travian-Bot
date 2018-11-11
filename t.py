@@ -224,7 +224,28 @@ class travian(object):
         if 'push' in self.config['villages'][vid]:
             temppush=self.config['villages'][vid]['push']
             temppushparams=self.config['villages'][vid]['pushparams']
-            doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
+
+            resource=None
+            try:
+                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            except Exception as e:
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+            if 'holdResources' in self.config['villages'][vid]:
+                for i in range(4):
+                    tmprs = resource[i]
+                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
+                    if tmprs<resource[i]:
+                        resource[i]=tmprs
+                    if resource[i]<0:
+                        resource[i]=0
+            tempsum = 0
+            for i in range(4):
+                if (resource[i]<temppushparams[i]):
+                    temppushparams[i] = resource[i]-resource[i]%50
+                tempsum = tempsum + temppushparams[i]
+            if (tempsum>=self.getMinMarketTreshold()):
+                doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
             print(dorf1['resource'])
