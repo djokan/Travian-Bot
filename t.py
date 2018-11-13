@@ -284,34 +284,39 @@ class travian(object):
             print('Start min Resource Building')
             self.build('resource')
         elif buildType == 'building':
-            bid = random.choice(self.config['villages'][vid]['building'])
-            print('Start to build building '+ str(bid))
-            #self.config['villages'][vid]['building']
-            fieldId=int( bid)
-            if fieldId > 0:
-                self.buildBuilding(fieldId)
+            self.prepareBuildBuilding(vid)
         elif buildType == 'both':
             print('Start min Resource Building')
             self.build('resource')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = random.choice(self.config['villages'][vid]['building'])
-            print('Start to build building '+ str(bid))
-            fieldId=int( bid)
-            if fieldId > 0:
-                self.buildBuilding(fieldId)
+            self.prepareBuildBuilding(vid)
         elif buildType == '15c':
             print('Start min Resource Building')
             self.build('15c')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = random.choice(self.config['villages'][vid]['building'])
+            self.prepareBuildBuilding(vid)
+    def prepareBuildBuilding(self,vid):
+        build=False
+        for i in range( len(self.config['villages'][vid]['building']  )):
+            bid = self.config['villages'][vid]['building'][i]
+            if 'dorf2html' not in self.config['villages'][vid]:
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+            if self.getBLvl(self.config['villages'][vid]['dorf2html'],bid)<self.config['villages'][vid]['buildinglvl'][i]:
+                build=True
+                break;
+        if build:
             print('Start to build building '+ str(bid))
+            #self.config['villages'][vid]['building']
             fieldId=int( bid)
             if fieldId > 0:
                 self.buildBuilding(fieldId)
+    def getBLvl(self, html, bid):
+        return int(getRegexValue(html,'build\.php\?id='+bid+'[^L]*Level (\d+)[^\d]'))
+        
     def villagesSendResources(self):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
@@ -752,11 +757,13 @@ class travian(object):
                 self.config['villages'][tempvid]['resource']=dorf1['resource']
                 self.config['villages'][tempvid]['fieldsList']=dorf1['fieldsList']
                 self.config['villages'][tempvid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
+                self.config['villages'][tempvid]['dorf1html']=temphtml
             if 'dorf2.php' in url:
                 dorf2 = self.analysisDorf2(temphtml)
                 self.config['villages'][tempvid]['delay']=dorf2['delay']
                 self.config['villages'][tempvid]['resource']=dorf2['resource']
                 self.config['villages'][tempvid]['stockBarFreeCrop']=dorf2['stockBarFreeCrop']
+                self.config['villages'][tempvid]['dorf2html']=temphtml
             if 'build.php' in url:
                 build = self.analysisBuild(temphtml)
                 self.config['villages'][tempvid]['delay']=build['delay']
