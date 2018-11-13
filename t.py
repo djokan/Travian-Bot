@@ -5,6 +5,7 @@ import time
 import json
 import datetime
 import traceback
+import random
 from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
@@ -126,7 +127,7 @@ class travian(object):
         available = int(available)
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
-        print('AVAILABLE:' + str(available))
+        print('Abailable merchants:' + str(available))
 	if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
@@ -145,7 +146,6 @@ class travian(object):
             r4 = str(r4)
         tempp = 0
         while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
-            print(r1+','+r2+','+r3+','+r4)
             if tempp%4==0 and int(r1)>50:
                 r1 = str(int(r1)-50)
             if tempp%4==1 and int(r2)>50:
@@ -156,8 +156,8 @@ class travian(object):
                 r4 = str(int(r4)-50)
             tempp = tempp+1
         print('Trying to send ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
-        print('a ' + str(int(r1)+int(r2)+int(r3)+int(r4)) + ' ' + str(self.getMinMarketTreshold()))
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
+            print('resource amount is too small')
             return
         data = getFirstMarketplaceData(html)
         print('Sending resources from ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
@@ -172,6 +172,9 @@ class travian(object):
         olddata= data
         html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         oldhtml = html
+        if 'You are allowed' in oldhtml:
+            print('Exceeded sending resource amount to this player!')
+            return
         data = getSecondMarketplaceData(html)
         data['r1'] = r1
         data['r2'] = r2
@@ -248,7 +251,7 @@ class travian(object):
                 doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
-            print(dorf1['resource'])
+            
             capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
             send = [0,0,0,0]
             tempsum = 0
@@ -281,9 +284,7 @@ class travian(object):
             print('Start min Resource Building')
             self.build('resource')
         elif buildType == 'building':
-            bid = self.config['villages'][vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
-                bid = self.config['villages'][vid]['building2']
+            bid = random.choice(self.config['villages'][vid]['building'])
             print('Start to build building '+ str(bid))
             #self.config['villages'][vid]['building']
             fieldId=int( bid)
@@ -295,9 +296,7 @@ class travian(object):
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = self.config['villages'][vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
-                bid = self.config['villages'][vid]['building2']
+            bid = random.choice(self.config['villages'][vid]['building'])
             print('Start to build building '+ str(bid))
             fieldId=int( bid)
             if fieldId > 0:
@@ -308,9 +307,7 @@ class travian(object):
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            bid = self.config['villages'][vid]['building']
-            if randint(1,5000)>2500 and 'building2' in self.config['villages'][vid]:
-                bid = self.config['villages'][vid]['building2']
+            bid = random.choice(self.config['villages'][vid]['building'])
             print('Start to build building '+ str(bid))
             fieldId=int( bid)
             if fieldId > 0:
