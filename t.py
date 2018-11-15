@@ -107,7 +107,11 @@ class travian(object):
                 sleepDelay = randint(9000,15000)
             print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
-            time.sleep(sleepDelay)
+            print('Press Ctrl+C if you do not want to wait!')
+            try:
+                time.sleep(sleepDelay)
+            except KeyboardInterrupt:
+                pass
             try:
                 self.getConfigViaTemp()
             except Exception as e:
@@ -172,7 +176,7 @@ class travian(object):
         olddata= data
         html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         oldhtml = html
-        if 'You are allowed' in oldhtml:
+        if 'allowed' in oldhtml:
             print('Exceeded sending resource amount to this player!')
             return
         data = getSecondMarketplaceData(html)
@@ -599,7 +603,9 @@ class travian(object):
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
         self.adventureExists = False
-        if 'class="speechBubbleContainer' in html:
+        productionCompile=re.compile('adventure.{1,200}class="speechBubbleContainer',re.S)
+        prs = productionCompile.findall(html)
+        if len(prs)>0:
             self.adventureExists = True
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
