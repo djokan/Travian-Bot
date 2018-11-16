@@ -220,12 +220,13 @@ class travian(object):
             if self.vid in self.villageCheckPeriod:
                 t=self.villageCheckPeriod[self.vid]
             doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid,vid)
+        if self.adventureExists and 'autoAdventure' in self.config:
+            doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.villagesSendResources()
     def checkVillage(self,vid):
         html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
         dorf1=self.config['villages'][self.vid]
-        if self.adventureExists and 'autoAdventure' in self.config:
-            doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
+
         if 'smallCelebration' in self.config['villages'][vid]:
             doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
         if 'push' in self.config['villages'][vid]:
