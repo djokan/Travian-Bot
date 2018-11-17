@@ -112,6 +112,7 @@ class travian(object):
                 time.sleep(sleepDelay)
             except KeyboardInterrupt:
                 pass
+            print('Woke up!')
             try:
                 self.getConfigViaTemp()
             except Exception as e:
@@ -253,7 +254,7 @@ class travian(object):
                     temppushparams[i] = resource[i]-resource[i]%50
                 tempsum = tempsum + temppushparams[i]
             if (tempsum>=self.getMinMarketTreshold()):
-                doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,self.config['villages'][temppush]['x'],self.config['villages'][temppush]['y'],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
+                doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,temppush[0],temppush[1],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
             
