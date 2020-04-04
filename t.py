@@ -132,7 +132,7 @@ class travian(object):
         available = int(available)
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
-        print('Abailable merchants:' + str(available))
+        print('Available merchants:' + str(available))
         if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
@@ -160,12 +160,12 @@ class travian(object):
             if tempp%4==3 and int(r4)>50:
                 r4 = str(int(r4)-50)
             tempp = tempp+1
-        print('Trying to send ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
+        print('Trying to send ' + str(self.vid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
             print('resource amount is too small')
             return
         data = getFirstMarketplaceData(html)
-        print('Sending resources from ' + str(self.vid) + ' ('+r1+','+r2+','+r3+','+r4+') to ('+x+'|'+y+')')
+        print('Sending resources from ' + str(self.vid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
