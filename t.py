@@ -53,7 +53,7 @@ class travian(object):
         self.vid=0 #village id
         self.getConfig()
         self.minlvl = -1
-	self.proxies = dict(http='socks5://127.0.0.1:9050',https='socks5://127.0.0.1:9050')
+        self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
         self.login()
@@ -133,7 +133,7 @@ class travian(object):
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
         print('Abailable merchants:' + str(available))
-	if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
+        if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
@@ -192,7 +192,6 @@ class travian(object):
             print(oldhtml)
             print(olddata)
             print('MarketDebugInfo2:')
-            print(html)
             print(data)
     def goToBuildingByName(self,name,linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
@@ -321,7 +320,7 @@ class travian(object):
             if fieldId > 0:
                 self.buildBuilding(fieldId)
     def getBLvl(self, html, bid):
-        return int(getRegexValue(html,'build\.php\?id='+bid+'[^L]*Level (\d+)[^\d]'))
+        return int(getRegexValue(html,'build\.php\?id='+str(bid)+'[^L]*Level (\d+)[^\d]'))
         
     def villagesSendResources(self):
         for vid in self.RequestedResources:
@@ -414,7 +413,7 @@ class travian(object):
             try:
                 m=re.search('waiting loop',html)
                 if m != None:
-                    print 'waiting loop detected!'
+                    print('waiting loop detected!')
                     return False
             except:
                 return False
@@ -600,8 +599,12 @@ class travian(object):
         for i in range(len(fieldsList)):
             if (len(fieldsList[i])<5):
                 self.greyField = True
-            gid=fieldsList[i][len(fieldsList[i])-2].replace('gid','')
-            level=fieldsList[i][len(fieldsList[i])-1].replace('level','')
+            for ii in fieldsList[i]:
+                if (ii[0:3] == 'gid'):
+                    gid=ii.replace('gid','')
+            for ii in fieldsList[i]:
+                if (ii[0:5] == 'level'):
+                    level =ii.replace('level','')
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
         self.adventureExists = False
@@ -681,13 +684,13 @@ class travian(object):
         login = parser.find('input', {'name': 'login'})['value']
         #start login
         data = {
-			    'name' : self.config['username'],
-			    'password': self.config['password'],
-			    's1': s1,
-			    'w': '1366:768',
-			    'login': login
-			}
-        html=self.sendRequest( self.config['server'] + 'dorf1.php', data)
+                            'name' : self.config['username'],
+                            'password': self.config['password'],
+                            's1': s1,
+                            'w': '1440:900',
+                            'login': login
+                        }
+        html=self.sendRequest( self.config['server'] + 'login.php', data)
         if html==False:
             return False
         self.loggedIn=True
@@ -699,15 +702,13 @@ class travian(object):
         villageVidsCompile=re.compile('coordinateX&')
         villageVids = villageVidsCompile.findall(html)
         villageAmount = len(villageVids)
-        nationCompile=re.compile('nation(\d)')
-        nation = nationCompile.findall(html)[0]
+        
         ajaxTokenCompile=re.compile('ajaxToken\s*=\s*\'(\w+)\'')
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         self.config['villagesAmount']=villageAmount
         self.config['vids'] = []
         for vid in self.config['villages']:
-	    self.config['vids'].append(vid) 
-        self.config['nation']=nation
+            self.config['vids'].append(vid)
         self.config['ajaxToken']=ajaxToken
         #print(self.config)
         #self.saveConfig()
@@ -739,7 +740,6 @@ class travian(object):
 
 
         if self.loggedIn and not 'ajax.php' in url and not self.config['server']==url:
-
             if 'playerName' not in html.text:
                 #log.warn('Suddenly logged off')
                 print('Suddenly logged off')
