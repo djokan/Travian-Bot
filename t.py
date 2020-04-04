@@ -200,12 +200,6 @@ class travian(object):
     def autoAdventure(self):
         print('Starting adventure')
         html=self.sendRequest(self.config['server']+'hero.php?t=3')
-        link = getRegexValue(html,'href="([^"]+)">To the adventure')
-        if link==None:
-            return
-        link = link.replace("&amp;","&")
-        print(link)
-        html=self.sendRequest(self.config['server']+link)
         data=getAdventureData(html)
         for key in data:
             if data[key]==None:
@@ -608,10 +602,11 @@ class travian(object):
             newFieldList[i]={'gid':int(gid),'level':int(level)}
         dorf1['fieldsList']=newFieldList
         self.adventureExists = False
-        productionCompile=re.compile('adventure.{1,200}class="speechBubbleContainer',re.S)
+        productionCompile=re.compile('class="content">(\d+)<',re.S)
         prs = productionCompile.findall(html)
         if len(prs)>0:
-            self.adventureExists = True
+            if int(prs[0])>0:
+                self.adventureExists = True
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
