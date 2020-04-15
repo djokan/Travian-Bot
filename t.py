@@ -236,7 +236,7 @@ class travian(object):
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
                     tmprs = resource[i]
-                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
+                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]
                     if tmprs<resource[i]:
                         resource[i]=tmprs
                     if resource[i]<0:
@@ -304,7 +304,7 @@ class travian(object):
             bid = self.config['villages'][vid]['building'][i]
             if 'dorf2html' not in self.config['villages'][vid]:
                 self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
-            if self.getBLvl(self.config['villages'][vid]['dorf2html'],bid)<self.config['villages'][vid]['buildinglvl'][i]:
+            if self.getBuildingLvl(vid, bid)<self.config['villages'][vid]['buildinglvl'][i]:
                 build=True
                 break;
         if build:
@@ -313,7 +313,11 @@ class travian(object):
             fieldId=int( bid)
             if fieldId > 0:
                 self.buildBuilding(fieldId)
-    def getBLvl(self, html, bid):
+    def getBuildingLvl(self, vid, bid):
+        if bid <=18:
+            html = self.config['villages'][vid]['dorf1html']
+        else:
+            html = self.config['villages'][vid]['dorf2html']
         return int(getRegexValue(html,'build\.php\?id='+str(bid)+'[^L]*Level (\d+)[^\d]'))
         
     def villagesSendResources(self):
