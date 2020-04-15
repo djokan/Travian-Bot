@@ -1,19 +1,33 @@
-{	
-  "username": "xxx",	
-  "password": "xxx",	
-  "server": "https://tx3.travian.com/",	
+{
+  "username": "xxx",
+  "password": "xxx",
+  "server": "https://tx3.travian.com/",
   "proxies": {	
     "http" : "socks5://127.0.0.1:9050",	
     "https" : "socks5://127.0.0.1:9050"	
-  },	
-  "headers": {	
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"	
-  },	
-  "storage":30439,	
-  "villages": {	
-    "22030": {	
-      "id": 22030,	
-      "buildType": "resource"	
-    }	
-  }	
+  },
+  "headers": {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"
+  },
+  "autoAdventure": "true", # send hero to adventure
+  "villages": {
+    "51212": {
+      "id": 51212,
+      "buildType": "building",
+      "building": [30,31,30,31,30,31],
+      "buildinglvl": [2,2,3,3,4,4],
+      "push": [13, 54],
+      "pushparams": [5000, 5000, 5000, 5000, 3600],
+      "holdResources": [0,0,0,0]
+    },
+    "13142": {
+      "id": 13142,
+      "buildType": "both",
+      "building": [23, 4, 23], # ids of buildings to build
+      "buildinglvl": [10, 3, 15], # target levels of buildings to build
+      "push": [32, 45], #push coordinates
+      "pushparams": [500, 500, 500, 500, 3600],   # wood, clay, iron, wheat, period[seconds]
+      "holdResources": [0,0,0,0] # hold at least [wood, clay, iron, wheat] resources in village when pushing
+    }
+  }
 }
