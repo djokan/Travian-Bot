@@ -2,7 +2,7 @@
   "username": "xxx",
   "password": "xxx",
   "server": "https://tx3.travian.com/",
-  "proxies": {	
+  "proxies": {
     "http" : "socks5://127.0.0.1:9050",	
     "https" : "socks5://127.0.0.1:9050"	
   },
@@ -13,21 +13,33 @@
   "villages": {
     "51212": {
       "id": 51212,
-      "buildType": "building",
+      "buildType": "building", # build only buildings in city centre
       "building": [30,31,30,31,30,31],
       "buildinglvl": [2,2,3,3,4,4],
       "push": [13, 54],
       "pushparams": [5000, 5000, 5000, 5000, 3600],
       "holdResources": [0,0,0,0]
     },
+    "34151": {
+      "id": 34151,
+      "buildType": "15c" # same as 'both', it builds only crop as resource field
+    },
+    "41241": {
+      "id": 41241,
+      "buildType": "resource" # builds resource fields
+                              # it chooses resource to build field with minimal level that 
+                              # currently has least units in warehouse
+    },
     "13142": {
       "id": 13142,
-      "buildType": "both",
+      "buildType": "both", #build both resources and buildings in city centre, effective only when roman
       "building": [23, 4, 23], # ids of buildings to build
       "buildinglvl": [10, 3, 15], # target levels of buildings to build
-      "push": [32, 45], #push coordinates
-      "pushparams": [500, 500, 500, 500, 3600],   # wood, clay, iron, wheat, period[seconds]
-      "holdResources": [0,0,0,0] # hold at least [wood, clay, iron, wheat] resources in village when pushing
+      "push": [32, 45], # send resources periodically to these coordinates
+      "pushparams": [500, 500, 500, 500, 3600], # wood, clay, iron, wheat and period[seconds] to be sent periodically
+      "holdResources": [0,0,0,0], # have at least [wood, clay, iron, wheat] resources in village, that won't be sent
+      "requestResourcesFrom": [51212, 34151], # if warehouse is below 80%, request resource from villages by id
+      "requestResourcesFromTime": [1000, 1500] # time that takes merchant to travel from source village to this village
     }
   }
 }
