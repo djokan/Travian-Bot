@@ -5,7 +5,7 @@ import time
 import json
 import datetime
 import traceback
-import os
+import subprocess
 import random
 from random import randint
 WAREHOUSECOEFF = 0.8
@@ -677,5 +677,8 @@ class travian(object):
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
-os.system("git pull")
+ret = subprocess.check_output("git pull", shell=True)
+if str(ret)[2:21] != 'Already up to date.':
+    print('A script is updated, please start again!')
+    exit(1)
 travian();
