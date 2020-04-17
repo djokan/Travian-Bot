@@ -52,7 +52,7 @@ class travian(object):
         self.delay=3
         self.vid=0 #village id
         self.getConfig()
-        self.minlvl = -1
+        self.globalMinResourceField = -1
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
@@ -96,10 +96,10 @@ class travian(object):
             now = datetime.datetime.now()
             if now.hour<randint(8,10) and now.hour >= randint(0,2):
                 sleep=True
-            if self.minlvl == -1:
+            if self.globalMinResourceField == -1:
                 sleepDelay = randint(1500,4000)
             else:
-                if self.minlvl<3:
+                if self.globalMinResourceField<3:
                     sleepDelay = randint(600,2500)
                 else:
                     sleepDelay = randint(1500,4000)
@@ -207,14 +207,14 @@ class travian(object):
         print(data)
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
     def villages(self):
-        self.minlvl = -1
+        self.globalMinResourceField = -1
         for vid in self.config['vids']:
             self.vid=str(vid)
             t=10
             if self.vid in self.villageCheckPeriod:
                 t=self.villageCheckPeriod[self.vid]
             doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid,vid)
-        if self.adventureExists and 'autoAdventure' in self.config:
+        if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.villagesSendResources()
     def checkVillage(self,vid):
@@ -224,36 +224,36 @@ class travian(object):
         if 'smallCelebration' in self.config['villages'][vid]:
             doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
         if 'push' in self.config['villages'][vid]:
-            temppush=self.config['villages'][vid]['push']
-            temppushparams=self.config['villages'][vid]['pushparams']
+            pushCoordinates=self.config['villages'][vid]['push']
+            pushResourcesAndPeriod=self.config['villages'][vid]['pushparams']
 
-            resource=None
+            availableResources=None
             try:
-                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                availableResources=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             except Exception as e:
                 self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
-                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                availableResources=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
-                    tmprs = resource[i]
-                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]
-                    if tmprs<resource[i]:
-                        resource[i]=tmprs
-                    if resource[i]<0:
-                        resource[i]=0
-            tempsum = 0
+                    tmprs = availableResources[i]
+                    availableResources[i]= availableResources[i]-self.config['villages'][vid]['holdResources'][i]
+                    if tmprs<availableResources[i]:
+                        availableResources[i]=tmprs
+                    if availableResources[i]<0:
+                        availableResources[i]=0
+            sendingSum = 0
             for i in range(4):
-                if (resource[i]<temppushparams[i]):
-                    temppushparams[i] = resource[i]-resource[i]%50
-                tempsum = tempsum + temppushparams[i]
-            if (tempsum>=self.getMinMarketTreshold()):
-                doOnceInSeconds(temppushparams[4],self.sendResources,'push '+self.vid,temppush[0],temppush[1],str(temppushparams[0]),str(temppushparams[1]),str(temppushparams[2]),str(temppushparams[3]),True)
+                if (availableResources[i]<pushResourcesAndPeriod[i]):
+                    pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
+                sendingSum = sendingSum + pushResourcesAndPeriod[i]
+            if (sendingSum>=self.getMinMarketTreshold()):
+                doOnceInSeconds(pushResourcesAndPeriod[4],self.sendResources,'push '+self.vid,pushCoordinates[0],pushCoordinates[1],str(pushResourcesAndPeriod[0]),str(pushResourcesAndPeriod[1]),str(pushResourcesAndPeriod[2]),str(pushResourcesAndPeriod[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
             
             capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
             send = [0,0,0,0]
-            tempsum = 0
+            sendingSum = 0
             for i in range(4):
                 if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
                     send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
@@ -261,14 +261,14 @@ class travian(object):
                     send[i] = send[i] - send[i]%100
                 else:
                     send[i] = 0
-                tempsum = tempsum + send[i]
+                sendingSum = sendingSum + send[i]
             timetemp = self.config['villages'][vid]['requestResourcesFromTime'][0]
             for i in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
                 if timetemp<self.config['villages'][vid]['requestResourcesFromTime'][i]:
                     timetemp = self.config['villages'][vid]['requestResourcesFromTime'][i]
             for index in range(len(self.config['villages'][vid]['requestResourcesFrom'])):
                 fromtemp = self.config['villages'][vid]['requestResourcesFrom'][index]
-                if tempsum>self.getMinMarketTreshold():
+                if sendingSum>self.getMinMarketTreshold():
                     self.RequestedResources[fromtemp] = [vid,send[0],send[1],send[2],send[3],timetemp]
             #self.requestResourcesIfNeeded()
         try:
@@ -338,13 +338,13 @@ class travian(object):
                         resource[i]=tmprs
                     if resource[i]<0:
                         resource[i]=0
-            tempsum = 0
+            sendingSum = 0
             for i in range(4):
                 if (resource[i]<self.RequestedResources[vid][i+1]):
                     self.RequestedResources[vid][i+1] = resource[i]-resource[i]%50
-                tempsum = tempsum + self.RequestedResources[vid][i+1]
+                sendingSum = sendingSum + self.RequestedResources[vid][i+1]
             print('Trying to send' + str(self.RequestedResources[vid]))
-            if (tempsum<self.getMinMarketTreshold()):
+            if (sendingSum<self.getMinMarketTreshold()):
                 continue
             to = str(self.RequestedResources[vid][0])
             r1 = str(self.RequestedResources[vid][1])
@@ -433,19 +433,19 @@ class travian(object):
         fieldsList=dorf1['fieldsList']
         newFieldsList={}
         notTopGidsList=[]
-        minlvl = 30
+        localMinResourceField = 30
         for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] < minlvl:
-                minlvl = fieldsList[i]['level']
-        if minlvl == -1:
+            if fieldsList[i]['level'] < localMinResourceField:
+                localMinResourceField = fieldsList[i]['level']
+        if localMinResourceField == -1:
             self.villageCheckPeriod[self.vid] = 1500
         else:
-            if minlvl<3:
+            if localMinResourceField<3:
                 self.villageCheckPeriod[self.vid] = 600
             else:
                 self.villageCheckPeriod[self.vid] = 1500
-        if self.minlvl == -1 or self.minlvl>minlvl:
-            self.minlvl = minlvl
+        if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
+            self.globalMinResourceField = localMinResourceField
         for i in range(len(fieldsList)):
             if fieldsList[i]['level'] <10:
                 newFieldsList[i]=fieldsList[i];
@@ -512,19 +512,19 @@ class travian(object):
         fieldsList=dorf1['fieldsList']
         newFieldsList={}
         notTopGidsList=[]
-        minlvl = 30
+        localMinResourceField = 30
         for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] < minlvl:
-                minlvl = fieldsList[i]['level']
-        if minlvl == -1:
+            if fieldsList[i]['level'] < localMinResourceField:
+                localMinResourceField = fieldsList[i]['level']
+        if localMinResourceField == -1:
             self.villageCheckPeriod[self.vid] = 1500
         else:
-            if minlvl<3:
+            if localMinResourceField<3:
                 self.villageCheckPeriod[self.vid] = 600
             else:
                 self.villageCheckPeriod[self.vid] = 1500
-        if self.minlvl == -1 or self.minlvl>minlvl:
-            self.minlvl = minlvl
+        if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
+            self.globalMinResourceField = localMinResourceField
         for i in range(len(fieldsList)):
             newFieldsList[i]=fieldsList[i];
             if fieldsList[i]['gid'] not in notTopGidsList:
@@ -595,7 +595,13 @@ class travian(object):
         newFieldList={}
         self.greyField = False
         for i in range(len(fieldsList)):
-            if (len(fieldsList[i])<5):
+            tempGreyField = True
+            for ii in fieldsList[i]:
+                if (ii[0:4] == 'good'):
+                    tempGreyField = False
+                if (ii[0:6] == 'notNow'):
+                    tempGreyField = False
+            if tempGreyField == True:
                 self.greyField = True
             for ii in fieldsList[i]:
                 if (ii[0:3] == 'gid'):
