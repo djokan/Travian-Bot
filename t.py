@@ -70,7 +70,6 @@ class travian(object):
         self.RequestedResources = {}
         self.config={}
         self.delay=3
-        self.currentVid=0 #village id
         self.getConfig()
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
@@ -130,7 +129,7 @@ class travian(object):
         constructionFinishTimes = []
         for vid in self.config['villages']:
             try:
-                for finishTime in self.config['villages'][str(vid)]['constructionFinishTimes']:
+                for finishTime in self.config['villages'][vid]['constructionFinishTimes']:
                     constructionFinishTimes.append(finishTime)
             except Exception as e:
                 pass
@@ -147,7 +146,7 @@ class travian(object):
             try:
                 villageProduction = villageData['production']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(vid))
+                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 villageProduction = villageData['production']
             woodProduction+=villageProduction[0]
             clayProduction+=villageProduction[1]
@@ -163,15 +162,15 @@ class travian(object):
 
     def holdSmallCelebration(self, vid):
         print('Hold Small Celebration village ' + vid)
-        html = self.goToBuildingByName('Town Hall','a=1&')
-    def sendResources(self,x,y,r1,r2,r3,r4,sendifNotEnough):
-        html = self.goToBuildingByName('Marketplace','t=5&')
+        html = self.goToBuildingByName(vid, 'Town Hall','a=1&')
+    def sendResources(self, vid, x, y, r1, r2, r3, r4, sendifNotEnough):
+        html = self.goToBuildingByName(vid, 'Marketplace','t=5&')
         available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\d+)')
         available = int(available)
         cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
         cancarry = int(cancarry)
         print('Available merchants:' + str(available))
-        if sendifNotEnough==False and int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
+        if sendifNotEnough==False and int(r1) + int(r2) + int(r3) + int(r4) > available*cancarry:
             return
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
@@ -198,12 +197,12 @@ class travian(object):
             if tempp%4==3 and int(r4)>50:
                 r4 = str(int(r4)-50)
             tempp = tempp+1
-        print('Trying to send ' + str(self.currentVid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
+        print('Trying to send ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
             print('resource amount is too small')
             return
         data = getFirstMarketplaceData(html)
-        print('Sending resources from ' + str(self.currentVid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
+        print('Sending resources from ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
@@ -231,10 +230,10 @@ class travian(object):
             print(olddata)
             print('MarketDebugInfo2:')
             print(data)
-    def goToBuildingByName(self,name,linkdata):
-        html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+    def goToBuildingByName(self, vid, name, linkdata):
+        html=self.sendRequest(self.config['server']+'dorf2.php?newdid=' + vid)
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
-        return self.sendRequest(self.config['server']+'build.php?'+linkdata+'id='+idb+'&newdid='+str(self.currentVid))
+        return self.sendRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
     def autoAdventure(self):
         print('Starting adventure')
         html=self.sendRequest(self.config['server']+'hero.php?t=3')
@@ -246,7 +245,6 @@ class travian(object):
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
     def checkVillages(self):
         for vid in self.config['villages']:
-            self.currentVid=str(vid)
             checkPeriod = self.getVillageCheckPeriod(vid)
             doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
@@ -266,7 +264,7 @@ class travian(object):
             try:
                 availableResources=self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+ vid)
+                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources=self.config['villages'][vid]['availableResources']
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
@@ -282,7 +280,7 @@ class travian(object):
                     pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
             if (sendingSum >= self.getMinMarketTreshold()):
-                doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid,pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
+                doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid, vid, pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             availableResources=data['availableResources']
             
@@ -311,7 +309,7 @@ class travian(object):
         except:
             self.config['villages'][vid]={}
             buildType='0'
-        print('Village: '+str(vid)+' build type:'+buildType)
+        print('Village: ' + vid + ' build type:'+buildType)
         if buildType == '0':
             pass
         elif buildType == 'resource':
@@ -333,7 +331,7 @@ class travian(object):
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
             self.buildBuilding(vid)
-    def buildBuilding(self,vid):
+    def buildBuilding(self, vid):
         build=False
         for i in range( len(self.config['villages'][vid]['building']  )):
             bid = self.config['villages'][vid]['building'][i]
@@ -355,10 +353,9 @@ class travian(object):
             html = self.config['villages'][vid]['dorf2html']
         return int(getRegexValue(html,'build\.php\?id='+str(bid)+'[^L]*Level (\d+)[^\d]'))
         
-    def sendRequestedResources(self):
+    def sendRequestedResources(self, vid):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
-            self.currentVid=str(vid)
             availableResources=None
             try:
                 availableResources = self.config['villages'][vid]['availableResources']
@@ -388,7 +385,7 @@ class travian(object):
             r4 = str(self.RequestedResources[vid][4])
             period = self.RequestedResources[vid][5]
 
-            doOnceInSeconds(period, self.sendResources, 'sendResources[' + vid + ']->' + to,self.config['villages'][to]['x'], self.config['villages'][to]['y'], r1, r2, r3, r4, True)
+            doOnceInSeconds(period, self.sendResources, 'sendResources[' + vid + ']->' + to, vid, self.config['villages'][to]['x'], self.config['villages'][to]['y'], r1, r2, r3, r4, True)
         self.RequestedResources = {}
 
     def buildResourceField(self, vid, type):
@@ -409,7 +406,7 @@ class travian(object):
             dorf = 1
         else:
             dorf = 2
-        html = self.sendRequest(self.config['server'] + 'build.php?newdid=' + str(vid) + '&id=' + str(filedId))
+        html = self.sendRequest(self.config['server'] + 'build.php?newdid=' + vid + '&id=' + str(filedId))
         try:
             try:
                 m=re.search('waiting loop', html)
@@ -429,7 +426,7 @@ class travian(object):
         self.sendRequest(self.config['server'] + 'dorf' + str(dorf) + '.php?a=' + str(filedId) + '&c=' + c + '&newdid=' + vid)
 
     def buildFindMinField(self, vid):
-        data=self.config['villages'][self.currentVid]
+        data=self.config['villages'][vid]
         availableResources=data['availableResources']
         fieldsList=data['fieldsList']
 
