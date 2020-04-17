@@ -252,9 +252,9 @@ class travian(object):
         html=self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
         data=self.config['villages'][vid]
 
-        if 'smallCelebration' in self.config['villages'][vid]:
+        if ('smallCelebration' in self.config['villages'][vid]) and self.config['villages'][vid]['smallCelebration'] == 'true':
             doOnceInSeconds(randint(3000,4000), self.holdSmallCelebration, 'holdSmallCelebration' + vid, vid)
-        if 'push' in self.config['villages'][vid]:
+        if ('push' in self.config['villages'][vid]) and len(self.config['villages'][vid]['push']) == 2:
             pushCoordinates=self.config['villages'][vid]['push']
             pushResourcesAndPeriod=self.config['villages'][vid]['pushparams']
 
@@ -264,7 +264,7 @@ class travian(object):
             except Exception as e:
                 self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources=self.config['villages'][vid]['availableResources']
-            if 'holdResources' in self.config['villages'][vid]:
+            if ('holdResources' in self.config['villages'][vid]) and len(self.config['villages'][vid]['holdResources']) == 4:
                 for i in range(4):
                     tmprs = availableResources[i]
                     availableResources[i]= availableResources[i]-self.config['villages'][vid]['holdResources'][i]
@@ -279,7 +279,7 @@ class travian(object):
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
             if (sendingSum >= self.getMinMarketTreshold()):
                 doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid, vid, pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
-        if 'requestResourcesFrom' in self.config['villages'][vid]:
+        if ('requestResourcesFrom' in self.config['villages'][vid]) and len(self.config['villages'][vid]['requestResourcesFrom']) > 0:
             availableResources=data['availableResources']
             
             capacity=data['capacity']
