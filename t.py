@@ -142,13 +142,12 @@ class travian(object):
         cropProduction=0
         allProduction=0
         for vid in self.config['villages']:
-            self.currentVid=str(vid)
-            villageData=self.config['villages'][self.currentVid]
+            villageData=self.config['villages'][vid]
             production=None
             try:
                 villageProduction = villageData['production']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(vid))
                 villageProduction = villageData['production']
             woodProduction+=villageProduction[0]
             clayProduction+=villageProduction[1]
@@ -162,8 +161,8 @@ class travian(object):
             minMarketTreshold = self.config['minMarketTreshold']
         return minMarketTreshold
 
-    def holdSmallCelebration(self):
-        print('Hold Small Celebration village ' + self.currentVid)
+    def holdSmallCelebration(self, vid):
+        print('Hold Small Celebration village ' + vid)
         html = self.goToBuildingByName('Town Hall','a=1&')
     def sendResources(self,x,y,r1,r2,r3,r4,sendifNotEnough):
         html = self.goToBuildingByName('Marketplace','t=5&')
@@ -249,16 +248,16 @@ class travian(object):
         for vid in self.config['villages']:
             self.currentVid=str(vid)
             checkPeriod = self.getVillageCheckPeriod(vid)
-            doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + self.currentVid, vid)
+            doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
-        self.villagesSendResources()
-    def checkVillage(self,vid):
-        html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.currentVid+'&')
-        data=self.config['villages'][self.currentVid]
+        self.sendRequestedResources(vid)
+    def checkVillage(self, vid):
+        html=self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
+        data=self.config['villages'][vid]
 
         if 'smallCelebration' in self.config['villages'][vid]:
-            doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.currentVid)
+            doOnceInSeconds(randint(3000,4000), self.holdSmallCelebration, 'holdSmallCelebration' + vid, vid)
         if 'push' in self.config['villages'][vid]:
             pushCoordinates=self.config['villages'][vid]['push']
             pushResourcesAndPeriod=self.config['villages'][vid]['pushparams']
@@ -267,7 +266,7 @@ class travian(object):
             try:
                 availableResources=self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+ vid)
                 availableResources=self.config['villages'][vid]['availableResources']
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
@@ -282,8 +281,8 @@ class travian(object):
                 if (availableResources[i]<pushResourcesAndPeriod[i]):
                     pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
-            if (sendingSum>=self.getMinMarketTreshold()):
-                doOnceInSeconds(pushResourcesAndPeriod[4],self.sendResources,'push '+self.currentVid,pushCoordinates[0],pushCoordinates[1],str(pushResourcesAndPeriod[0]),str(pushResourcesAndPeriod[1]),str(pushResourcesAndPeriod[2]),str(pushResourcesAndPeriod[3]),True)
+            if (sendingSum >= self.getMinMarketTreshold()):
+                doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid,pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
             availableResources=data['availableResources']
             
@@ -317,19 +316,19 @@ class travian(object):
             pass
         elif buildType == 'resource':
             print('Start min Resource Building')
-            self.buildResourceField('resource')
+            self.buildResourceField(vid, 'resource')
         elif buildType == 'building':
             self.buildBuilding(vid)
         elif buildType == 'both':
             print('Start min Resource Building')
-            self.buildResourceField('resource')
+            self.buildResourceField(vid, 'resource')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
             self.buildBuilding(vid)
         elif buildType == '15c':
             print('Start min Resource Building')
-            self.buildResourceField('15c')
+            self.buildResourceField(vid, '15c')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
@@ -339,7 +338,7 @@ class travian(object):
         for i in range( len(self.config['villages'][vid]['building']  )):
             bid = self.config['villages'][vid]['building'][i]
             if 'dorf2html' not in self.config['villages'][vid]:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
             if self.getBuildingLvl(vid, bid)<self.config['villages'][vid]['buildinglvl'][i]:
                 build=True
                 break;
@@ -348,7 +347,7 @@ class travian(object):
             #self.config['villages'][vid]['building']
             fieldId=int( bid)
             if fieldId > 0:
-                self.buildField(fieldId)
+                self.buildField(vid, fieldId)
     def getBuildingLvl(self, vid, bid):
         if bid <=18:
             html = self.config['villages'][vid]['dorf1html']
@@ -356,7 +355,7 @@ class travian(object):
             html = self.config['villages'][vid]['dorf2html']
         return int(getRegexValue(html,'build\.php\?id='+str(bid)+'[^L]*Level (\d+)[^\d]'))
         
-    def villagesSendResources(self):
+    def sendRequestedResources(self):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             self.currentVid=str(vid)
@@ -364,12 +363,12 @@ class travian(object):
             try:
                 availableResources = self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources = self.config['villages'][vid]['availableResources']
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
                     tmprs = availableResources[i]
-                    availableResources[i]= availableResources[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
+                    availableResources[i]= availableResources[i] - self.config['villages'][vid]['holdResources'][i] + randint(1,2000)-1000
                     if tmprs<availableResources[i]:
                         availableResources[i]=tmprs
                     if availableResources[i]<0:
@@ -387,39 +386,39 @@ class travian(object):
             r2 = str(self.RequestedResources[vid][2])
             r3 = str(self.RequestedResources[vid][3])
             r4 = str(self.RequestedResources[vid][4])
-            temptime = self.RequestedResources[vid][5]
+            period = self.RequestedResources[vid][5]
 
-            doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.currentVid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
+            doOnceInSeconds(period, self.sendResources, 'sendResources[' + vid + ']->' + to,self.config['villages'][to]['x'], self.config['villages'][to]['y'], r1, r2, r3, r4, True)
         self.RequestedResources = {}
 
-    def buildResourceField(self,type):
+    def buildResourceField(self, vid, type):
         if type == '15c':
-            fieldId=self.buildFindMinFieldCrop()
+            fieldId=self.buildFindMinFieldCrop(vid)
             if fieldId:
-                self.buildField(fieldId)
+                self.buildField(vid, fieldId)
 
         if type == 'resource':
-            fieldId=self.buildFindMinField()
+            fieldId=self.buildFindMinField(vid)
             if fieldId:
-                self.buildField(fieldId)
+                self.buildField(vid, fieldId)
 
 
-    def buildField(self, filedId):
-        print('Start Building on Village '+ str(self.currentVid) +' field '+str(filedId))
-        if filedId <=18:
-            dorf=1
+    def buildField(self, vid, filedId):
+        print('Start Building on Village ' + vid + ' field ' + str(filedId))
+        if filedId <= 18:
+            dorf = 1
         else:
-            dorf=2
-        html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.currentVid)+'&id='+str(filedId))
+            dorf = 2
+        html = self.sendRequest(self.config['server'] + 'build.php?newdid=' + str(vid) + '&id=' + str(filedId))
         try:
             try:
-                m=re.search('waiting loop',html)
+                m=re.search('waiting loop', html)
                 if m != None:
                     print('waiting loop detected!')
                     return False
             except:
                 return False
-            m=re.search('(?<=&amp;c=)(\w+)',html)
+            m = re.search('(?<=&amp;c=)(\w+)', html)
         #maybe not enough resource.
         except:
             return False
@@ -427,9 +426,9 @@ class travian(object):
             return False
         c = m.group(0)
 
-        self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.currentVid))
+        self.sendRequest(self.config['server'] + 'dorf' + str(dorf) + '.php?a=' + str(filedId) + '&c=' + c + '&newdid=' + vid)
 
-    def buildFindMinField(self):
+    def buildFindMinField(self, vid):
         data=self.config['villages'][self.currentVid]
         availableResources=data['availableResources']
         fieldsList=data['fieldsList']
@@ -467,7 +466,7 @@ class travian(object):
         return False;
 
     def getMinResourceFieldLevel(self, vid):
-        data=self.config['villages'][self.currentVid]
+        data=self.config['villages'][vid]
         if 'fieldsList' not in data:
             return 30
         fieldsList=data['fieldsList']
@@ -490,8 +489,8 @@ class travian(object):
             return 600
         return 1500
 
-    def buildFindMinFieldCrop(self):
-        data=self.config['villages'][self.currentVid]
+    def buildFindMinFieldCrop(self, vid):
+        data=self.config['villages'][vid]
         availableResources=data['availableResources']
         fieldsList=data['fieldsList']
 
