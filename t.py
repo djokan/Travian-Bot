@@ -677,7 +677,9 @@ class travian(object):
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
+subprocess.check_output("git stash --all", shell=True)
 ret = subprocess.check_output("git pull", shell=True)
+subprocess.check_output("git stash pop", shell=True)
 if str(ret)[2:21] != 'Already up to date.':
     print('A script is updated, please start again!')
     exit(1)
