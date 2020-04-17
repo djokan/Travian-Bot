@@ -10,13 +10,21 @@ from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
 doneTasksDelay = {}
+def getConstructionFinishTimes(html):
+    parser = BeautifulSoup(html, "html5lib")
+    constructionTimeFields = parser.find_all('div', {'class': 'buildDuration'})
+    constructionFinishTimes = []
+    for constructionTimeField in constructionTimeFields:
+        remainingTime = int(constructionTimeField.find('span', {'class': 'timer'})['value'])
+        constructionFinishTimes.append(remainingTime + time.time())
+    return constructionFinishTimes
 def mergeDict(d1,d2):
-    retd = {}
+    ret = {}
     for e in d1:
-        retd[e] = d1[e]
+        ret[e] = d1[e]
     for e in d2:
-        retd[e] = d2[e]
-    return retd
+        ret[e] = d2[e]
+    return ret
 def doOnceInSeconds(delay,function,function_name,*args):
     if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=doneTasksDelay[function_name])<datetime.datetime.now():
         doneTasks[function_name] = datetime.datetime.now()
@@ -61,11 +69,9 @@ class travian(object):
     def __init__(self):
         self.RequestedResources = {}
         self.config={}
-        self.villageCheckPeriod={}
         self.delay=3
         self.currentVid=0 #village id
         self.getConfig()
-        self.globalMinResourceField = -1
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
@@ -83,24 +89,8 @@ class travian(object):
                 time.sleep(30)
                 self.getConfigViaTemp()
                 continue
-            now = datetime.datetime.now()
-            sleeptime=False
-            if now.hour>randint(0,2) and now.hour<randint(6,8):
-                sleeptime=True
-            sleep=False
-            now = datetime.datetime.now()
-            if now.hour<randint(8,10) and now.hour >= randint(0,2):
-                sleep=True
-            if self.globalMinResourceField == -1:
-                sleepDelay = randint(1500,4000)
-            else:
-                if self.globalMinResourceField<3:
-                    sleepDelay = randint(600,2500)
-                else:
-                    sleepDelay = randint(1500,4000)
-            if sleep:
-                sleepDelay = randint(9000,15000)
-            print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
+            sleepDelay = self.getNextSleepDelay()
+            print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(int(sleepDelay/60)) + ' min ' + str(int(sleepDelay%60)) + ' sec' )
             print('Press Ctrl+C if you do not want to wait!')
             try:
                 time.sleep(sleepDelay)
@@ -110,14 +100,48 @@ class travian(object):
             try:
                 self.getConfigViaTemp()
             except Exception as e:
-                useless=3
+                pass
+
+    def getNextSleepDelay(self):
+        now = datetime.datetime.now()
+
+        isNightTime = False
+        if now.hour<randint(8,10) and now.hour >= randint(0,2):
+            isNightTime = True
+        sleepDelay = 0
+        if self.getGlobalMinResourceFieldLevel() > 20:
+            sleepDelay = randint(1500,4000)
+        else:
+            if self.getGlobalMinResourceFieldLevel()<3:
+                sleepDelay = randint(600,2500)
+            else:
+                sleepDelay = randint(1500,4000)
+        if isNightTime:
+            sleepDelay = randint(9000,15000)
+        constructionFinishTimes = self.getAllConstructionFinishTimes()
+        for constructionFinishTime in constructionFinishTimes:
+            constructionFinishDelay = constructionFinishTime - time.time()
+            if constructionFinishDelay < sleepDelay*1.4 and constructionFinishDelay > sleepDelay*0.4:
+                sleepDelay = constructionFinishDelay + randint(0, 300)
+                break
+        return sleepDelay
+
+    def getAllConstructionFinishTimes(self):
+        constructionFinishTimes = []
+        for vid in self.config['villages']:
+            try:
+                for finishTime in self.config['villages'][str(vid)]['constructionFinishTimes']:
+                    constructionFinishTimes.append(finishTime)
+            except Exception as e:
+                pass
+        return constructionFinishTimes
     def printProductionData(self):
         woodProduction=0
         clayProduction=0
         ironProduction=0
         cropProduction=0
         allProduction=0
-        for vid in self.config['vids']:
+        for vid in self.config['villages']:
             self.currentVid=str(vid)
             villageData=self.config['villages'][self.currentVid]
             production=None
@@ -222,13 +246,10 @@ class travian(object):
         print(data)
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
     def checkVillages(self):
-        self.globalMinResourceField = -1
-        for vid in self.config['vids']:
+        for vid in self.config['villages']:
             self.currentVid=str(vid)
-            t=10
-            if self.currentVid in self.villageCheckPeriod:
-                t=self.villageCheckPeriod[self.currentVid]
-            doOnceInSeconds(t,self.checkVillage,'checkvill'+self.currentVid,vid)
+            checkPeriod = self.getVillageCheckPeriod(vid)
+            doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + self.currentVid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.villagesSendResources()
@@ -296,24 +317,24 @@ class travian(object):
             pass
         elif buildType == 'resource':
             print('Start min Resource Building')
-            self.build('resource')
+            self.buildResourceField('resource')
         elif buildType == 'building':
-            self.prepareBuildBuilding(vid)
+            self.buildBuilding(vid)
         elif buildType == 'both':
             print('Start min Resource Building')
-            self.build('resource')
+            self.buildResourceField('resource')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            self.prepareBuildBuilding(vid)
+            self.buildBuilding(vid)
         elif buildType == '15c':
             print('Start min Resource Building')
-            self.build('15c')
+            self.buildResourceField('15c')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
-            self.prepareBuildBuilding(vid)
-    def prepareBuildBuilding(self,vid):
+            self.buildBuilding(vid)
+    def buildBuilding(self,vid):
         build=False
         for i in range( len(self.config['villages'][vid]['building']  )):
             bid = self.config['villages'][vid]['building'][i]
@@ -327,7 +348,7 @@ class travian(object):
             #self.config['villages'][vid]['building']
             fieldId=int( bid)
             if fieldId > 0:
-                self.buildBuilding(fieldId)
+                self.buildField(fieldId)
     def getBuildingLvl(self, vid, bid):
         if bid <=18:
             html = self.config['villages'][vid]['dorf1html']
@@ -371,36 +392,25 @@ class travian(object):
             doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.currentVid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
         self.RequestedResources = {}
 
-    def build(self,type):
-        try:
-            delay=self.config['villages'][self.currentVid]['delay']
-        except:
-            delay=0
-        if delay > time.time():
-            return False
-
+    def buildResourceField(self,type):
         if type == '15c':
             fieldId=self.buildFindMinFieldCrop()
             if fieldId:
-                self.buildBuilding(fieldId)
-            
+                self.buildField(fieldId)
+
         if type == 'resource':
             fieldId=self.buildFindMinField()
             if fieldId:
-                self.buildBuilding(fieldId)
+                self.buildField(fieldId)
 
 
-    def buildBuilding(self, filedId):
+    def buildField(self, filedId):
         print('Start Building on Village '+ str(self.currentVid) +' field '+str(filedId))
         if filedId <=18:
             dorf=1
         else:
             dorf=2
-        #upgrade
-        #http://ts20.travian.tw/build.php?id=29
         html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.currentVid)+'&id='+str(filedId))
-
-        #print(self.config['server']+'build.php?newdid='+str(self.currentVid)+'&id='+str(filedId))
         try:
             try:
                 m=re.search('waiting loop',html)
@@ -417,59 +427,86 @@ class travian(object):
             return False
         c = m.group(0)
 
-        #http://ts20.travian.tw/dorf2.php?a=18&id=31&c=130461
         self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.currentVid))
-        #self.sendRequest(self.server+'dorf2.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.village))
 
     def buildFindMinField(self):
         data=self.config['villages'][self.currentVid]
         availableResources=data['availableResources']
         fieldsList=data['fieldsList']
-        newFieldsList={}
-        notTopGidsList=[]
-        localMinResourceField = 30
-        for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] < localMinResourceField:
-                localMinResourceField = fieldsList[i]['level']
-        if localMinResourceField == -1:
-            self.villageCheckPeriod[self.currentVid] = 1500
-        else:
-            if localMinResourceField<3:
-                self.villageCheckPeriod[self.currentVid] = 600
-            else:
-                self.villageCheckPeriod[self.currentVid] = 1500
-        if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
-            self.globalMinResourceField = localMinResourceField
+
+        buildableFieldList={}
+        buildableResourceTypes=[]
         for i in range(len(fieldsList)):
             if fieldsList[i]['level'] <10:
-                newFieldsList[i]=fieldsList[i];
-                if fieldsList[i]['gid'] not in notTopGidsList:
-                    notTopGidsList.append(fieldsList[i]['gid'])
+                buildableFieldList[i] = fieldsList[i];
+                if fieldsList[i]['gid'] not in buildableResourceTypes:
+                    buildableResourceTypes.append(fieldsList[i]['gid'])
 
-        #the resource list removed the all 10 level
-        newResource={}
-        minResourceWithoutTop=999999999999999
-        minResourceWithoutTopKey=999999999999999  #always less then 5
+        minAvailableResource=999999999999999
+        desiredResourceType=999999999999999  #always less then 5
         for i in range(len(availableResources)):
-            if i+1 in notTopGidsList:
-                if(availableResources[i]<minResourceWithoutTop):
-                    minResourceWithoutTop=availableResources[i]
-                    minResourceWithoutTopKey=i+1
-        if minResourceWithoutTopKey > 5:
+            if i in buildableResourceTypes:
+                if(availableResources[i]<minAvailableResource):
+                    minAvailableResource=availableResources[i]
+                    desiredResourceType=i
+        if desiredResourceType > 4:
             return False
         if data['villageHasGreyField'] == True and data['stockBarFreeCrop']<10:
-            minResourceWithoutTopKey = 4
-        minLevel=999999999999
-        minLevelKey=99999999999
+            desiredResourceType = 3 #crop
+        desiredFieldLevel=999999999999
+        desiredFieldIndex=99999999999
 
-        for i in newFieldsList:
-            if newFieldsList[i]['gid'] == minResourceWithoutTopKey:
-                if newFieldsList[i]['level'] <minLevel:
-                    minLevel= newFieldsList[i]['level']
-                    minLevelKey=i
+        for i in buildableFieldList:
+            if buildableFieldList[i]['gid'] == desiredResourceType:
+                if buildableFieldList[i]['level'] <desiredFieldLevel:
+                    desiredFieldLevel = buildableFieldList[i]['level']
+                    desiredFieldIndex = i
 
-        if minLevelKey < 18: #it always less then 18
-            return minLevelKey+1;
+        if desiredFieldIndex < 18: #it always less then 18
+            return desiredFieldIndex+1;
+        return False;
+
+    def getMinResourceFieldLevel(self, vid):
+        data=self.config['villages'][self.currentVid]
+        if 'fieldsList' not in data:
+            return 30
+        fieldsList=data['fieldsList']
+
+        minResourceFieldLevel = 30
+        for i in range(len(fieldsList)):
+            if fieldsList[i]['level'] < minResourceFieldLevel:
+                minResourceFieldLevel = fieldsList[i]['level']
+        return minResourceFieldLevel
+
+    def getGlobalMinResourceFieldLevel(self):
+        globalMinResourceFieldLevel = 30
+        for vid in self.config['villages']:
+            if globalMinResourceFieldLevel > self.getMinResourceFieldLevel(vid):
+                globalMinResourceFieldLevel = self.getMinResourceFieldLevel(vid)
+        return globalMinResourceFieldLevel
+
+    def getVillageCheckPeriod(self, vid):
+        if  self.getMinResourceFieldLevel(vid) < 3:
+            return 600
+        return 1500
+
+    def buildFindMinFieldCrop(self):
+        data=self.config['villages'][self.currentVid]
+        availableResources=data['availableResources']
+        fieldsList=data['fieldsList']
+
+        desiredResourceType = 3 # crop
+        desiredFieldLevel = 999999999999
+        desiredFieldIndex = 99999999999
+
+        for i in fieldsList:
+            if fieldsList[i]['gid'] == desiredResourceType:
+                if fieldsList[i]['level'] < desiredFieldLevel:
+                    desiredFieldLevel= fieldsList[i]['level']
+                    desiredFieldIndex=i
+
+        if desiredFieldIndex < 18: #it always less then 18
+            return desiredFieldIndex+1;
         return False;
 
     def analysisBuild(self,html):
@@ -484,94 +521,22 @@ class travian(object):
 
         data = mergeDict(data, getResourceData(html))
 
-        isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
-        data['delay']=0
-        if isUnderConstruction == None:
-            underConstruction=False
-        else:
-            underConstruction=True
-            timer1=parser.find('span',{'id':'timer1'})
-            try:
-                timer1a=timer1.text.split(':')
-                #delay for current building
-                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
-            except:
-                pass
         return data
-    def buildFindMinFieldCrop(self):
-        data=self.config['villages'][self.currentVid]
-        availableResources=data['availableResources']
-        fieldsList=data['fieldsList']
-        newFieldsList={}
-        notTopGidsList=[]
-        localMinResourceField = 30
-        for i in range(len(fieldsList)):
-            if fieldsList[i]['level'] < localMinResourceField:
-                localMinResourceField = fieldsList[i]['level']
-        if localMinResourceField == -1:
-            self.villageCheckPeriod[self.currentVid] = 1500
-        else:
-            if localMinResourceField<3:
-                self.villageCheckPeriod[self.currentVid] = 600
-            else:
-                self.villageCheckPeriod[self.currentVid] = 1500
-        if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
-            self.globalMinResourceField = localMinResourceField
-        for i in range(len(fieldsList)):
-            newFieldsList[i]=fieldsList[i];
-            if fieldsList[i]['gid'] not in notTopGidsList:
-                notTopGidsList.append(fieldsList[i]['gid'])
 
-        #the resource list removed the all 10 level
-        newResource={}
-        minResourceWithoutTop=999999999999999
-        minResourceWithoutTopKey=999999999999999  #always less then 5
-        for i in range(len(availableResources)):
-            if i+1 in notTopGidsList:
-                if(availableResources[i]<minResourceWithoutTop):
-                    minResourceWithoutTop=availableResources[i]
-                    minResourceWithoutTopKey=i+1
-        if minResourceWithoutTopKey > 5:
-            return False
-        minResourceWithoutTopKey = 4
-        minLevel=999999999999
-        minLevelKey=99999999999
-
-        for i in newFieldsList:
-            if newFieldsList[i]['gid'] == minResourceWithoutTopKey:
-                if newFieldsList[i]['level'] <minLevel:
-                    minLevel= newFieldsList[i]['level']
-                    minLevelKey=i
-
-        if minLevelKey < 18: #it always less then 18
-            return minLevelKey+1;
-        return False;
     def analysisDorf2(self,html):
         data={}
         if not html:
             return False
-        parser = BeautifulSoup(html, "html5lib")
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
         
         data = mergeDict(data, getResourceData(html))
-        isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
 
-        data['delay']=0
-        if isUnderConstruction == None:
-            underConstruction=False
-        else:
-            underConstruction=True
-            timer1=parser.find('span',{'id':'timer1'})
-            try:
-                timer1a=timer1.text.split(':')
-                #delay for current building
-                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
-            except:
-                pass
+        data['constructionFinishTimes'] = getConstructionFinishTimes(html)
         return data
+
     def analysisDorf1(self,html):
         data={}
         if not html:
@@ -596,7 +561,7 @@ class travian(object):
             for ii in fieldsList[i]:
                 if (ii[0:5] == 'level'):
                     level = ii.replace('level','')
-            newFieldList[i] = {'gid':int(gid),'level':int(level)}
+            newFieldList[i] = {'gid':int(gid)-1,'level':int(level)}
         data['fieldsList'] = newFieldList
         self.adventureExists = False
         productionCompile = re.compile('class="content">(\d+)<',re.S)
@@ -611,21 +576,7 @@ class travian(object):
 
         data = mergeDict(data, getResourceData(html))
 
-        isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
-
-
-        data['delay']=0
-        if isUnderConstruction == None:
-            underConstruction=False
-        else:
-            underConstruction=True
-            timer1=parser.find('span',{'id':'timer1'})
-            try:
-                timer1a=timer1.text.split(':')
-                #delay for current building
-                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
-            except:
-                pass
+        data['constructionFinishTimes'] = getConstructionFinishTimes(html)
         return data
 
     def getConfigViaTemp(self):
@@ -694,9 +645,6 @@ class travian(object):
         ajaxTokenCompile=re.compile('ajaxToken\s*=\s*\'(\w+)\'')
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         self.config['villagesAmount']=villageAmount
-        self.config['vids'] = []
-        for vid in self.config['villages']:
-            self.config['vids'].append(vid)
         self.config['ajaxToken']=ajaxToken
         #print(self.config)
         #self.saveConfig()
