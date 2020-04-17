@@ -132,6 +132,7 @@ class travian(object):
             except Exception as e:
                 pass
         return constructionFinishTimes
+
     def printProductionData(self):
         woodProduction=0
         clayProduction=0
@@ -152,6 +153,7 @@ class travian(object):
             cropProduction+=villageProduction[3]
         allProduction += woodProduction + clayProduction + ironProduction + cropProduction
         print('Production: wood-' + str(woodProduction) + ' clay-' + str(clayProduction) + ' iron-' + str(ironProduction) + ' crop-' + str(cropProduction) + ' all-' + str(allProduction))
+
     def getMinMarketTreshold(self):
         minMarketTreshold= 400
         if 'minMarketTreshold' in self.config:
@@ -161,6 +163,7 @@ class travian(object):
     def holdSmallCelebration(self, vid):
         print('Hold Small Celebration village ' + vid)
         html = self.goToBuildingByName(vid, 'Town Hall','a=1&')
+
     def sendResources(self, vid, x, y, r1, r2, r3, r4, sendifNotEnough):
         html = self.goToBuildingByName(vid, 'Marketplace','t=5&')
         available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\d+)')
@@ -228,10 +231,12 @@ class travian(object):
             print(olddata)
             print('MarketDebugInfo2:')
             print(data)
+
     def goToBuildingByName(self, vid, name, linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid=' + vid)
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
         return self.sendRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
+
     def autoAdventure(self):
         print('Starting adventure')
         html=self.sendRequest(self.config['server']+'hero.php?t=3')
@@ -241,6 +246,7 @@ class travian(object):
                 return
         print(data)
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
+
     def checkVillages(self):
         for vid in self.config['villages']:
             checkPeriod = self.getVillageCheckPeriod(vid)
@@ -248,6 +254,7 @@ class travian(object):
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.sendRequestedResources(vid)
+
     def checkVillage(self, vid):
         html=self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
         data=self.config['villages'][vid]
@@ -329,27 +336,40 @@ class travian(object):
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
             self.buildBuilding(vid)
+
+    def resourceFieldLevelsSum(self, vid):
+        data=self.config['villages'][vid]
+        fieldsList=data['fieldsList']
+
+        levelsSum = 0
+        for i in range(len(fieldsList)):
+            levelsSum = levelsSum + fieldsList[i]['level']
+        return levelsSum
+
     def buildBuilding(self, vid):
         build=False
         for i in range( len(self.config['villages'][vid]['building']  )):
-            bid = self.config['villages'][vid]['building'][i]
+            buildingId = self.config['villages'][vid]['building'][i]
             if 'dorf2html' not in self.config['villages'][vid]:
                 self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
-            if self.getBuildingLvl(vid, bid)<self.config['villages'][vid]['buildinglvl'][i]:
+            targetLevel = self.config['villages'][vid]['buildinglvl'][i]
+            if (buildingId==0 and self.resourceFieldLevelsSum(vid) < targetLevel) or (buildingId>0 and self.getBuildingLvl(vid, buildingId) < targetLevel):
                 build=True
                 break;
         if build:
-            print('Start to build building '+ str(bid))
-            #self.config['villages'][vid]['building']
-            fieldId=int( bid)
-            if fieldId > 0:
-                self.buildField(vid, fieldId)
-    def getBuildingLvl(self, vid, bid):
-        if bid <=18:
+            if buildingId == 0:
+                self.buildResourceField(vid, 'resource')
+                return
+            print('Start to build building ' + str(buildingId))
+            if buildingId > 0:
+                self.buildField(vid, buildingId)
+
+    def getBuildingLvl(self, vid, buildingId):
+        if buildingId <=18:
             html = self.config['villages'][vid]['dorf1html']
         else:
             html = self.config['villages'][vid]['dorf2html']
-        return int(getRegexValue(html,'build\.php\?id='+str(bid)+'[^L]*Level (\d+)[^\d]'))
+        return int(getRegexValue(html,'build\.php\?id='+str(buildingId)+'[^L]*Level (\d+)[^\d]'))
         
     def sendRequestedResources(self, vid):
         for vid in self.RequestedResources:
@@ -638,8 +658,6 @@ class travian(object):
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
-    def getVillages(self):
-        pass
 
     def sendRequest(self,url,data={}):
         time.sleep(randint(1,5))
@@ -694,6 +712,7 @@ class travian(object):
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
+
 subprocess.check_output("git stash --all", shell=True)
 ret = subprocess.check_output("git pull", shell=True)
 subprocess.check_output("git stash pop", shell=True)
