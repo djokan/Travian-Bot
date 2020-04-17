@@ -5,6 +5,7 @@ import time
 import json
 import datetime
 import traceback
+import os
 import random
 from random import randint
 WAREHOUSECOEFF = 0.8
@@ -65,17 +66,19 @@ def getSecondMarketplaceData(html):
     data['cmd']='prepareMarketplace'
     data['x2']='1'
     return data
+
+
 class travian(object):
     def __init__(self):
         self.RequestedResources = {}
         self.config={}
-        self.getConfig(true) # shutdown if error
+        self.getConfig(True) # shutdown if error
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
         self.login()
         while 1:
-            self.getConfig(false) # don't shutdown if error
+            self.getConfig(False) # don't shutdown if error
             try:
                 if self.loggedIn==False:
                     self.login()
@@ -569,7 +572,7 @@ class travian(object):
         data['constructionFinishTimes'] = getConstructionFinishTimes(html)
         return data
 
-   def getConfig(self, shutdownIfError):
+    def getConfig(self, shutdownIfError):
         try:
             with open('config.json','r+') as configFile:
                 tempconfig =json.load(configFile)
@@ -674,5 +677,5 @@ class travian(object):
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
-
+os.system("git pull")
 travian();
