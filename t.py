@@ -10,11 +10,24 @@ from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
 doneTasksDelay = {}
+def mergeDict(d1,d2):
+    retd = {}
+    for e in d1:
+        retd[e] = d1[e]
+    for e in d2:
+        retd[e] = d2[e]
+    return retd
 def doOnceInSeconds(delay,function,function_name,*args):
     if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=doneTasksDelay[function_name])<datetime.datetime.now():
         doneTasks[function_name] = datetime.datetime.now()
         doneTasksDelay[function_name] = delay
         function(*args)
+def getResourceData(html):
+    productionCompile = re.compile('"l[1-4]":\s(-?\d*)')
+    prs = productionCompile.findall(html)
+    for i in range(len(prs)):
+        prs[i] = int(prs[i])
+    return {'production': prs[0:4], 'availableResources' : prs[4:8], 'capacity' : prs[8:12]}
 def getRegexValue(stringFrom,regex):
     try:
         idbCompile=re.compile(regex,re.S)
@@ -50,7 +63,7 @@ class travian(object):
         self.config={}
         self.villageCheckPeriod={}
         self.delay=3
-        self.vid=0 #village id
+        self.currentVid=0 #village id
         self.getConfig()
         self.globalMinResourceField = -1
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
@@ -61,26 +74,8 @@ class travian(object):
             try:
                 if self.loggedIn==False:
                     self.login()
-                self.villages()
-                woodpro=0
-                claypro=0
-                ironpro=0
-                croppro=0
-                allpro=0
-                for vid in self.config['vids']:
-                    self.vid=str(vid)
-                    dorf1=self.config['villages'][self.vid]
-                    resource=None
-                    try:
-                        resource = [dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
-                    except Exception as e:
-                        self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
-                        resource = [dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2],dorf1['resource'][3]]
-                    woodpro+=resource[0]
-                    claypro+=resource[1]
-                    ironpro+=resource[2]
-                    croppro+=resource[3]
-                allpro+=woodpro+claypro+ironpro+croppro
+                self.checkVillages()
+                self.printProductionData()
                 
             except Exception as e:
                 print(traceback.format_exc())
@@ -105,7 +100,6 @@ class travian(object):
                     sleepDelay = randint(1500,4000)
             if sleep:
                 sleepDelay = randint(9000,15000)
-            print('Production: wood-' + str(woodpro) + ' clay-' + str(claypro) + ' iron-' + str(ironpro) + ' crop-' + str(croppro) + ' all-' + str(allpro))
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(sleepDelay/60) + ' min ' + str(sleepDelay%60) + ' sec' )
             print('Press Ctrl+C if you do not want to wait!')
             try:
@@ -117,6 +111,27 @@ class travian(object):
                 self.getConfigViaTemp()
             except Exception as e:
                 useless=3
+    def printProductionData(self):
+        woodProduction=0
+        clayProduction=0
+        ironProduction=0
+        cropProduction=0
+        allProduction=0
+        for vid in self.config['vids']:
+            self.currentVid=str(vid)
+            villageData=self.config['villages'][self.currentVid]
+            production=None
+            try:
+                villageProduction = villageData['production']
+            except Exception as e:
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                villageProduction = villageData['production']
+            woodProduction+=villageProduction[0]
+            clayProduction+=villageProduction[1]
+            ironProduction+=villageProduction[2]
+            cropProduction+=villageProduction[3]
+        allProduction += woodProduction + clayProduction + ironProduction + cropProduction
+        print('Production: wood-' + str(woodProduction) + ' clay-' + str(clayProduction) + ' iron-' + str(ironProduction) + ' crop-' + str(cropProduction) + ' all-' + str(allProduction))
     def getMinMarketTreshold(self):
         minMarketTreshold= 400
         if 'minMarketTreshold' in self.config:
@@ -124,7 +139,7 @@ class travian(object):
         return minMarketTreshold
 
     def holdSmallCelebration(self):
-        print('Hold Small Celebration village ' + self.vid)
+        print('Hold Small Celebration village ' + self.currentVid)
         html = self.goToBuildingByName('Town Hall','a=1&')
     def sendResources(self,x,y,r1,r2,r3,r4,sendifNotEnough):
         html = self.goToBuildingByName('Marketplace','t=5&')
@@ -160,12 +175,12 @@ class travian(object):
             if tempp%4==3 and int(r4)>50:
                 r4 = str(int(r4)-50)
             tempp = tempp+1
-        print('Trying to send ' + str(self.vid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
+        print('Trying to send ' + str(self.currentVid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
             print('resource amount is too small')
             return
         data = getFirstMarketplaceData(html)
-        print('Sending resources from ' + str(self.vid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
+        print('Sending resources from ' + str(self.currentVid) + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         data['r1'] = r1
         data['r2'] = r2
         data['r3'] = r3
@@ -194,9 +209,9 @@ class travian(object):
             print('MarketDebugInfo2:')
             print(data)
     def goToBuildingByName(self,name,linkdata):
-        html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+        html=self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
         idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
-        return self.sendRequest(self.config['server']+'build.php?'+linkdata+'id='+idb+'&newdid='+str(self.vid))
+        return self.sendRequest(self.config['server']+'build.php?'+linkdata+'id='+idb+'&newdid='+str(self.currentVid))
     def autoAdventure(self):
         print('Starting adventure')
         html=self.sendRequest(self.config['server']+'hero.php?t=3')
@@ -206,33 +221,33 @@ class travian(object):
                 return
         print(data)
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
-    def villages(self):
+    def checkVillages(self):
         self.globalMinResourceField = -1
         for vid in self.config['vids']:
-            self.vid=str(vid)
+            self.currentVid=str(vid)
             t=10
-            if self.vid in self.villageCheckPeriod:
-                t=self.villageCheckPeriod[self.vid]
-            doOnceInSeconds(t,self.checkVillage,'checkvill'+self.vid,vid)
+            if self.currentVid in self.villageCheckPeriod:
+                t=self.villageCheckPeriod[self.currentVid]
+            doOnceInSeconds(t,self.checkVillage,'checkvill'+self.currentVid,vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.villagesSendResources()
     def checkVillage(self,vid):
-        html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.vid+'&')
-        dorf1=self.config['villages'][self.vid]
+        html=self.sendRequest(self.config['server']+'dorf1.php?newdid='+self.currentVid+'&')
+        data=self.config['villages'][self.currentVid]
 
         if 'smallCelebration' in self.config['villages'][vid]:
-            doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.vid)
+            doOnceInSeconds(randint(3000,4000),self.holdSmallCelebration,'holdSmallCelebration'+self.currentVid)
         if 'push' in self.config['villages'][vid]:
             pushCoordinates=self.config['villages'][vid]['push']
             pushResourcesAndPeriod=self.config['villages'][vid]['pushparams']
 
             availableResources=None
             try:
-                availableResources=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                availableResources=self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
-                availableResources=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                availableResources=self.config['villages'][vid]['availableResources']
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
                     tmprs = availableResources[i]
@@ -247,16 +262,16 @@ class travian(object):
                     pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
             if (sendingSum>=self.getMinMarketTreshold()):
-                doOnceInSeconds(pushResourcesAndPeriod[4],self.sendResources,'push '+self.vid,pushCoordinates[0],pushCoordinates[1],str(pushResourcesAndPeriod[0]),str(pushResourcesAndPeriod[1]),str(pushResourcesAndPeriod[2]),str(pushResourcesAndPeriod[3]),True)
+                doOnceInSeconds(pushResourcesAndPeriod[4],self.sendResources,'push '+self.currentVid,pushCoordinates[0],pushCoordinates[1],str(pushResourcesAndPeriod[0]),str(pushResourcesAndPeriod[1]),str(pushResourcesAndPeriod[2]),str(pushResourcesAndPeriod[3]),True)
         if 'requestResourcesFrom' in self.config['villages'][vid]:
-            resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
+            availableResources=data['availableResources']
             
-            capacity=[dorf1['resource'][8],dorf1['resource'][9],dorf1['resource'][10],dorf1['resource'][11]]
+            capacity=data['capacity']
             send = [0,0,0,0]
             sendingSum = 0
             for i in range(4):
-                if (capacity[i]*(WAREHOUSECOEFF-0.1)>resource[i]):
-                    send[i] = capacity[i]*WAREHOUSECOEFF-resource[i]
+                if (capacity[i]*(WAREHOUSECOEFF-0.1)>availableResources[i]):
+                    send[i] = capacity[i]*WAREHOUSECOEFF-availableResources[i]
                     send[i] = int(send[i])/len(self.config['villages'][vid]['requestResourcesFrom'])
                     send[i] = send[i] - send[i]%100
                 else:
@@ -303,7 +318,7 @@ class travian(object):
         for i in range( len(self.config['villages'][vid]['building']  )):
             bid = self.config['villages'][vid]['building'][i]
             if 'dorf2html' not in self.config['villages'][vid]:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
             if self.getBuildingLvl(vid, bid)<self.config['villages'][vid]['buildinglvl'][i]:
                 build=True
                 break;
@@ -323,25 +338,25 @@ class travian(object):
     def villagesSendResources(self):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
-            self.vid=str(vid)
-            resource=None
+            self.currentVid=str(vid)
+            availableResources=None
             try:
-                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                availableResources = self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.vid))
-                resource=[self.config['villages'][vid]['resource'][4],self.config['villages'][vid]['resource'][5],self.config['villages'][vid]['resource'][6],self.config['villages'][vid]['resource'][7]]
+                self.sendRequest(self.config['server']+'dorf2.php?newdid='+str(self.currentVid))
+                availableResources = self.config['villages'][vid]['availableResources']
             if 'holdResources' in self.config['villages'][vid]:
                 for i in range(4):
-                    tmprs = resource[i]
-                    resource[i]= resource[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
-                    if tmprs<resource[i]:
-                        resource[i]=tmprs
-                    if resource[i]<0:
-                        resource[i]=0
+                    tmprs = availableResources[i]
+                    availableResources[i]= availableResources[i]-self.config['villages'][vid]['holdResources'][i]+ randint(1,2000)-1000
+                    if tmprs<availableResources[i]:
+                        availableResources[i]=tmprs
+                    if availableResources[i]<0:
+                        availableResources[i]=0
             sendingSum = 0
             for i in range(4):
-                if (resource[i]<self.RequestedResources[vid][i+1]):
-                    self.RequestedResources[vid][i+1] = resource[i]-resource[i]%50
+                if (availableResources[i]<self.RequestedResources[vid][i+1]):
+                    self.RequestedResources[vid][i+1] = availableResources[i]-availableResources[i]%50
                 sendingSum = sendingSum + self.RequestedResources[vid][i+1]
             print('Trying to send' + str(self.RequestedResources[vid]))
             if (sendingSum<self.getMinMarketTreshold()):
@@ -353,12 +368,12 @@ class travian(object):
             r4 = str(self.RequestedResources[vid][4])
             temptime = self.RequestedResources[vid][5]
 
-            doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.vid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
+            doOnceInSeconds(temptime,self.sendResources,'sendResources['+self.currentVid+']->'+to,self.config['villages'][to]['x'],self.config['villages'][to]['y'],r1,r2,r3,r4,True)
         self.RequestedResources = {}
 
     def build(self,type):
         try:
-            delay=self.config['villages'][self.vid]['delay']
+            delay=self.config['villages'][self.currentVid]['delay']
         except:
             delay=0
         if delay > time.time():
@@ -370,43 +385,22 @@ class travian(object):
                 self.buildBuilding(fieldId)
             
         if type == 'resource':
-            #if dorf1['delay'] == 0:
-
-            #check 
-
-            #stockBarWarehouse=int(dorf1['resource'][8])
-            #stockBarGranary=int(dorf1['resource'][11])
-            #withoutFoodMaxProduction=int(max([dorf1['resource'][0],dorf1['resource'][1],dorf1['resource'][2]]))
-            #foodProduction=int(dorf1['resource'][3])
-
-
-            #if stockBarWarehouse<withoutFoodMaxProduction*100 and stockBarWarehouse < 10000 or stockBarWarehouse<withoutFoodMaxProduction*10 and stockBarWarehouse < 80000:
-            #    print('Start to build WareHouse')
-            #    self.buildBuilding(29)
-            #    return True
-            #if stockBarGranary<foodProduction*100 and stockBarGranary < 10000 or stockBarGranary<foodProduction*10 and stockBarGranary < 80000:
-            #    print('Start to build Garanary')
-            #    self.buildBuilding(25)
-            #    return True
-
-            #find min resource and fieldID
-
             fieldId=self.buildFindMinField()
             if fieldId:
                 self.buildBuilding(fieldId)
 
 
     def buildBuilding(self, filedId):
-        print('Start Building on Village '+ str(self.vid) +' field '+str(filedId))
+        print('Start Building on Village '+ str(self.currentVid) +' field '+str(filedId))
         if filedId <=18:
             dorf=1
         else:
             dorf=2
         #upgrade
         #http://ts20.travian.tw/build.php?id=29
-        html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
+        html=self.sendRequest(self.config['server']+'build.php?newdid='+str(self.currentVid)+'&id='+str(filedId))
 
-        #print(self.config['server']+'build.php?newdid='+str(self.vid)+'&id='+str(filedId))
+        #print(self.config['server']+'build.php?newdid='+str(self.currentVid)+'&id='+str(filedId))
         try:
             try:
                 m=re.search('waiting loop',html)
@@ -424,13 +418,13 @@ class travian(object):
         c = m.group(0)
 
         #http://ts20.travian.tw/dorf2.php?a=18&id=31&c=130461
-        self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.vid))
+        self.sendRequest(self.config['server']+'dorf'+str(dorf)+'.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.currentVid))
         #self.sendRequest(self.server+'dorf2.php?a='+str(filedId)+'&c='+c+'&newdid='+str(self.village))
 
     def buildFindMinField(self):
-        dorf1=self.config['villages'][self.vid]
-        resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
-        fieldsList=dorf1['fieldsList']
+        data=self.config['villages'][self.currentVid]
+        availableResources=data['availableResources']
+        fieldsList=data['fieldsList']
         newFieldsList={}
         notTopGidsList=[]
         localMinResourceField = 30
@@ -438,12 +432,12 @@ class travian(object):
             if fieldsList[i]['level'] < localMinResourceField:
                 localMinResourceField = fieldsList[i]['level']
         if localMinResourceField == -1:
-            self.villageCheckPeriod[self.vid] = 1500
+            self.villageCheckPeriod[self.currentVid] = 1500
         else:
             if localMinResourceField<3:
-                self.villageCheckPeriod[self.vid] = 600
+                self.villageCheckPeriod[self.currentVid] = 600
             else:
-                self.villageCheckPeriod[self.vid] = 1500
+                self.villageCheckPeriod[self.currentVid] = 1500
         if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
             self.globalMinResourceField = localMinResourceField
         for i in range(len(fieldsList)):
@@ -456,14 +450,14 @@ class travian(object):
         newResource={}
         minResourceWithoutTop=999999999999999
         minResourceWithoutTopKey=999999999999999  #always less then 5
-        for i in range(len(resource)):
+        for i in range(len(availableResources)):
             if i+1 in notTopGidsList:
-                if(resource[i]<minResourceWithoutTop):
-                    minResourceWithoutTop=resource[i]
+                if(availableResources[i]<minResourceWithoutTop):
+                    minResourceWithoutTop=availableResources[i]
                     minResourceWithoutTopKey=i+1
         if minResourceWithoutTopKey > 5:
             return False
-        if self.greyField == True and dorf1['stockBarFreeCrop']<10:
+        if data['villageHasGreyField'] == True and data['stockBarFreeCrop']<10:
             minResourceWithoutTopKey = 4
         minLevel=999999999999
         minLevelKey=99999999999
@@ -477,23 +471,21 @@ class travian(object):
         if minLevelKey < 18: #it always less then 18
             return minLevelKey+1;
         return False;
+
     def analysisBuild(self,html):
-        build={}
+        data={}
         if not html:
             return False
         parser = BeautifulSoup(html, "html5lib")
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
-            build['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
-        prs = productionCompile.findall(html)
-        for i in range(len(prs)):
-            prs[i]=int(prs[i])
-        
-        build['resource'] =prs
+            data['stockBarFreeCrop']=int(prs[i].replace(".",""))
+
+        data = mergeDict(data, getResourceData(html))
+
         isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
-        build['delay']=0
+        data['delay']=0
         if isUnderConstruction == None:
             underConstruction=False
         else:
@@ -502,14 +494,14 @@ class travian(object):
             try:
                 timer1a=timer1.text.split(':')
                 #delay for current building
-                build['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
+                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
             except:
                 pass
-        return build
+        return data
     def buildFindMinFieldCrop(self):
-        dorf1=self.config['villages'][self.vid]
-        resource=[dorf1['resource'][4],dorf1['resource'][5],dorf1['resource'][6],dorf1['resource'][7]]
-        fieldsList=dorf1['fieldsList']
+        data=self.config['villages'][self.currentVid]
+        availableResources=data['availableResources']
+        fieldsList=data['fieldsList']
         newFieldsList={}
         notTopGidsList=[]
         localMinResourceField = 30
@@ -517,12 +509,12 @@ class travian(object):
             if fieldsList[i]['level'] < localMinResourceField:
                 localMinResourceField = fieldsList[i]['level']
         if localMinResourceField == -1:
-            self.villageCheckPeriod[self.vid] = 1500
+            self.villageCheckPeriod[self.currentVid] = 1500
         else:
             if localMinResourceField<3:
-                self.villageCheckPeriod[self.vid] = 600
+                self.villageCheckPeriod[self.currentVid] = 600
             else:
-                self.villageCheckPeriod[self.vid] = 1500
+                self.villageCheckPeriod[self.currentVid] = 1500
         if self.globalMinResourceField == -1 or self.globalMinResourceField>localMinResourceField:
             self.globalMinResourceField = localMinResourceField
         for i in range(len(fieldsList)):
@@ -534,10 +526,10 @@ class travian(object):
         newResource={}
         minResourceWithoutTop=999999999999999
         minResourceWithoutTopKey=999999999999999  #always less then 5
-        for i in range(len(resource)):
+        for i in range(len(availableResources)):
             if i+1 in notTopGidsList:
-                if(resource[i]<minResourceWithoutTop):
-                    minResourceWithoutTop=resource[i]
+                if(availableResources[i]<minResourceWithoutTop):
+                    minResourceWithoutTop=availableResources[i]
                     minResourceWithoutTopKey=i+1
         if minResourceWithoutTopKey > 5:
             return False
@@ -555,24 +547,19 @@ class travian(object):
             return minLevelKey+1;
         return False;
     def analysisDorf2(self,html):
-        dorf2={}
+        data={}
         if not html:
             return False
         parser = BeautifulSoup(html, "html5lib")
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
-            dorf2['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
-        prs = productionCompile.findall(html)
-        for i in range(len(prs)):
-            prs[i]=int(prs[i])
+            data['stockBarFreeCrop']=int(prs[i].replace(".",""))
         
-        dorf2['resource'] =prs
+        data = mergeDict(data, getResourceData(html))
         isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
 
-
-        dorf2['delay']=0
+        data['delay']=0
         if isUnderConstruction == None:
             underConstruction=False
         else:
@@ -581,38 +568,38 @@ class travian(object):
             try:
                 timer1a=timer1.text.split(':')
                 #delay for current building
-                dorf2['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
+                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
             except:
                 pass
-        return dorf2
+        return data
     def analysisDorf1(self,html):
-        dorf1={}
+        data={}
         if not html:
             return False
         parser = BeautifulSoup(html, "html5lib")
         fields = parser.find_all('div', {'class': 'labelLayer'})
         fieldsList = [field.find_parent('div')['class'] for field in fields]
         newFieldList={}
-        self.greyField = False
+        data['villageHasGreyField'] = False
         for i in range(len(fieldsList)):
-            tempGreyField = True
+            isFieldGray = True
             for ii in fieldsList[i]:
                 if (ii[0:4] == 'good'):
-                    tempGreyField = False
+                    isFieldGray = False
                 if (ii[0:6] == 'notNow'):
-                    tempGreyField = False
-            if tempGreyField == True:
-                self.greyField = True
+                    isFieldGray = False
+            if isFieldGray == True:
+                data['villageHasGreyField'] = True
             for ii in fieldsList[i]:
                 if (ii[0:3] == 'gid'):
                     gid=ii.replace('gid','')
             for ii in fieldsList[i]:
                 if (ii[0:5] == 'level'):
-                    level =ii.replace('level','')
-            newFieldList[i]={'gid':int(gid),'level':int(level)}
-        dorf1['fieldsList']=newFieldList
+                    level = ii.replace('level','')
+            newFieldList[i] = {'gid':int(gid),'level':int(level)}
+        data['fieldsList'] = newFieldList
         self.adventureExists = False
-        productionCompile=re.compile('class="content">(\d+)<',re.S)
+        productionCompile = re.compile('class="content">(\d+)<',re.S)
         prs = productionCompile.findall(html)
         if len(prs)>0:
             if int(prs[0])>0:
@@ -620,17 +607,14 @@ class travian(object):
         productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
-            dorf1['stockBarFreeCrop']=int(prs[i].replace(".",""))
-        productionCompile=re.compile('"l[1-4]":\s(-?\d*)')
-        prs = productionCompile.findall(html)
-        for i in range(len(prs)):
-            prs[i]=int(prs[i])
-        
-        dorf1['resource'] =prs
+            data['stockBarFreeCrop']=int(prs[i].replace(".",""))
+
+        data = mergeDict(data, getResourceData(html))
+
         isUnderConstruction = parser.find('div', {'class': 'buildDuration'})
 
 
-        dorf1['delay']=0
+        data['delay']=0
         if isUnderConstruction == None:
             underConstruction=False
         else:
@@ -639,11 +623,10 @@ class travian(object):
             try:
                 timer1a=timer1.text.split(':')
                 #delay for current building
-                dorf1['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
+                data['delay']=60*60*int(timer1a[0])+60*int(timer1a[1])+int(timer1a[2])+time.time()
             except:
                 pass
-        return dorf1
-
+        return data
 
     def getConfigViaTemp(self):
         with open('config.json','r+') as configFile:
@@ -761,28 +744,18 @@ class travian(object):
                         #log.error('Could not relogin %d time' %reconnects)
                         print(('Could not relogin %d time' %reconnects))
                         time.sleep(self.delay)
-        temphtml = html.text
         if 'newdid=' in url:
-            tempvid = getRegexValue(url,'newdid=(\d+)')
+            vid = getRegexValue(url,'newdid=(\d+)')
+            data = {}
             if 'dorf1.php' in url:
-                dorf1 = self.analysisDorf1(temphtml)
-                self.config['villages'][tempvid]['delay']=dorf1['delay']
-                self.config['villages'][tempvid]['resource']=dorf1['resource']
-                self.config['villages'][tempvid]['fieldsList']=dorf1['fieldsList']
-                self.config['villages'][tempvid]['stockBarFreeCrop']=dorf1['stockBarFreeCrop']
-                self.config['villages'][tempvid]['dorf1html']=temphtml
+                data = self.analysisDorf1(html.text)
+                self.config['villages'][vid]['dorf1html']=html.text
             if 'dorf2.php' in url:
-                dorf2 = self.analysisDorf2(temphtml)
-                self.config['villages'][tempvid]['delay']=dorf2['delay']
-                self.config['villages'][tempvid]['resource']=dorf2['resource']
-                self.config['villages'][tempvid]['stockBarFreeCrop']=dorf2['stockBarFreeCrop']
-                self.config['villages'][tempvid]['dorf2html']=temphtml
+                data = self.analysisDorf2(html.text)
+                self.config['villages'][vid]['dorf2html']=html.text
             if 'build.php' in url:
-                build = self.analysisBuild(temphtml)
-                self.config['villages'][tempvid]['delay']=build['delay']
-                self.config['villages'][tempvid]['resource']=build['resource']
-                self.config['villages'][tempvid]['stockBarFreeCrop']=build['stockBarFreeCrop']
-                
+                data = self.analysisBuild(html.text)
+            self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
 
