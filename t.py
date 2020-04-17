@@ -97,6 +97,7 @@ class travian(object):
             except KeyboardInterrupt:
                 pass
             print('Woke up!')
+            time.sleep(1)
 
     def getNextSleepDelay(self):
         now = datetime.datetime.now()
@@ -577,7 +578,7 @@ class travian(object):
             with open('config.json','r+') as configFile:
                 tempconfig =json.load(configFile)
                 configFile.close()
-                self.config = tempconfig
+                self.updateConfig(tempconfig)
             if 'proxies' in self.config:
                 self.proxies = dict()
                 if 'http' in self.config['proxies']:
@@ -587,6 +588,22 @@ class travian(object):
         except Exception as e:
             if shutdownIfError:
                 raise e
+
+    def updateConfig(self, new1):
+        for element1 in new1:
+            if (not isinstance(new1[element1], dict)) or (element1 not in self.config):
+                self.config[element1] = new1[element1]
+            else:
+                for element2 in new1[element1]:
+                    if (not isinstance(new1[element1][element2], dict)) or (element2 not in self.config[element1]):
+                        self.config[element1][element2] = new1[element1][element2]
+                    else:
+                        for element3 in new1[element1][element2]:
+                            if (not isinstance(new1[element1][element2][element3], dict)) or (element3 not in self.config[element1][element2]):
+                                self.config[element1][element2][element3] = new1[element1][element2][element3]
+                            else:
+                                for element4 in new1[element1][element2][element3]:
+                                    self.config[element1][element2][element3][element4] = new1[element1][element2][element3][element4]
 
     def login(self):
         print('Start Login')
