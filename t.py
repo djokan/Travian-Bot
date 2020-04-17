@@ -69,24 +69,22 @@ class travian(object):
     def __init__(self):
         self.RequestedResources = {}
         self.config={}
-        self.delay=3
-        self.getConfig()
+        self.getConfig(true) # shutdown if error
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
         self.loggedIn=False
         self.login()
         while 1:
+            self.getConfig(false) # don't shutdown if error
             try:
                 if self.loggedIn==False:
                     self.login()
                 self.checkVillages()
                 self.printProductionData()
-                
             except Exception as e:
                 print(traceback.format_exc())
                 print('Waiting for internet connection (30 sec)')
                 time.sleep(30)
-                self.getConfigViaTemp()
                 continue
             sleepDelay = self.getNextSleepDelay()
             print('Sleeping! Time= ' + str(datetime.datetime.time(datetime.datetime.now())) + ', Delay= ' + str(int(sleepDelay/60)) + ' min ' + str(int(sleepDelay%60)) + ' sec' )
@@ -96,10 +94,6 @@ class travian(object):
             except KeyboardInterrupt:
                 pass
             print('Woke up!')
-            try:
-                self.getConfigViaTemp()
-            except Exception as e:
-                pass
 
     def getNextSleepDelay(self):
         now = datetime.datetime.now()
@@ -575,40 +569,22 @@ class travian(object):
         data['constructionFinishTimes'] = getConstructionFinishTimes(html)
         return data
 
-    def getConfigViaTemp(self):
-        with open('config.json','r+') as configFile:
-            self.tempconfig=json.load(configFile)
-            configFile.close()
-            self.config = self.tempconfig
-        if 'proxies' in self.config:
-            self.proxies = dict()
-            if 'http' in self.config['proxies']:
-                self.proxies['http'] = self.config['proxies']['http']
-            if 'https' in self.config['proxies']:
-                self.proxies['https'] = self.config['proxies']['https']
-        html=self.sendRequest( self.config['server'] + 'dorf1.php', {})
-        if html==False:
-            return False
-        self.loggedIn=True
-        #soup=BeautifulSoup(h.text, "html5lib")
-        #print(soup.prettify())
-        self.getInfo(html)
-    def getConfig(self):
-        with open('config.json','r+') as configFile:
-            self.config=json.load(configFile)
-            configFile.close()
-        if 'proxies' in self.config:
-            self.proxies = dict()
-            if 'http' in self.config['proxies']:
-                self.proxies['http'] = self.config['proxies']['http']
-            if 'https' in self.config['proxies']:
-                self.proxies['https'] = self.config['proxies']['https']
-    def saveConfig(self):
-         with open('config.json','r+') as configFile:
-            self.config=json.load(configFile)
-            configFile.seek(0)
-            json.dump(self.config, configFile)
-            configFile.close()
+   def getConfig(self, shutdownIfError):
+        try:
+            with open('config.json','r+') as configFile:
+                tempconfig =json.load(configFile)
+                configFile.close()
+                self.config = tempconfig
+            if 'proxies' in self.config:
+                self.proxies = dict()
+                if 'http' in self.config['proxies']:
+                    self.proxies['http'] = self.config['proxies']['http']
+                if 'https' in self.config['proxies']:
+                    self.proxies['https'] = self.config['proxies']['https']
+        except Exception as e:
+            if shutdownIfError:
+                raise e
+
     def login(self):
         print('Start Login')
         html = self.sendRequest(self.config['server'])
@@ -642,15 +618,11 @@ class travian(object):
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
-        #print(self.config)
-        #self.saveConfig()
     def getVillages(self):
         pass
 
     def sendRequest(self,url,data={}):
-        time.sleep(self.delay)
-        #print(url)
-        #print(len(data))
+        time.sleep(randint(1,5))
         
         try:
             if len(data) == 0:
@@ -687,7 +659,7 @@ class travian(object):
                         reconnects += 1
                         #log.error('Could not relogin %d time' %reconnects)
                         print(('Could not relogin %d time' %reconnects))
-                        time.sleep(self.delay)
+                        time.sleep(randint(1,5))
         if 'newdid=' in url:
             vid = getRegexValue(url,'newdid=(\d+)')
             data = {}
