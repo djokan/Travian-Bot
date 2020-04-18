@@ -334,9 +334,9 @@ class travian(object):
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
             self.buildBuilding(vid)
-        elif buildType == '15c':
+        elif buildType == 'cropandbuilding':
             print('Start min Resource Building')
-            self.buildResourceField(vid, '15c')
+            self.buildResourceField(vid, 'cropandbuilding')
             tempDelay = randint(3,7)
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
@@ -415,7 +415,7 @@ class travian(object):
         self.RequestedResources = {}
 
     def buildResourceField(self, vid, type):
-        if type == '15c':
+        if type == 'cropandbuilding':
             fieldId=self.buildFindMinFieldCrop(vid)
             if fieldId:
                 self.buildField(vid, fieldId)
