@@ -112,7 +112,10 @@ class travian(object):
             if self.getGlobalMinResourceFieldLevel()<3:
                 sleepDelay = randint(600,2500)
             else:
-                sleepDelay = randint(1500,4000)
+                if self.getGlobalMinResourceFieldLevel()<7:
+                    sleepDelay = randint(900,2700)
+                else:
+                    sleepDelay = randint(1500,4000)
         if isNightTime:
             sleepDelay = randint(9000,15000)
         constructionFinishTimes = self.getAllConstructionFinishTimes()
@@ -147,6 +150,7 @@ class travian(object):
             except Exception as e:
                 self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 villageProduction = villageData['production']
+            print('Village: ' + vid + ' resource fields level sum - ' + str(self.resourceFieldLevelsSum(vid)))
             woodProduction+=villageProduction[0]
             clayProduction+=villageProduction[1]
             ironProduction+=villageProduction[2]
@@ -369,6 +373,9 @@ class travian(object):
             html = self.config['villages'][vid]['dorf1html']
         else:
             html = self.config['villages'][vid]['dorf2html']
+        if getRegexValue(html,'build\.php\?id='+str(buildingId)+'[^L]*Level (\d+)[^\d]') == None:
+            print('There is no building on field ' + str(buildingId))
+            return 30
         return int(getRegexValue(html,'build\.php\?id='+str(buildingId)+'[^L]*Level (\d+)[^\d]'))
         
     def sendRequestedResources(self, vid):
@@ -661,17 +668,14 @@ class travian(object):
 
     def sendRequest(self,url,data={}):
         time.sleep(randint(1,5))
-        
+        html = None
         try:
             if len(data) == 0:
-                #print('get')
-                #html = requests.get(url,headers=self.headers,cookies=self.cookies)
                 if 'proxies' in self.config:
                     html=self.session.get(url,headers = self.config['headers'], proxies=self.proxies)
                 else:
                     html=self.session.get(url,headers=self.config['headers'])
             else:
-                #print('POST')
                 if 'proxies' in self.config:
                     html=self.session.post(url,headers=self.config['headers'],data=data, proxies=self.proxies)
                 else:
@@ -679,7 +683,6 @@ class travian(object):
         except:
             print('Net problem, cant fetch the URL'+url)
             return False
-
 
         if self.loggedIn and not 'ajax.php' in url and not self.config['server']==url:
             if 'playerName' not in html.text:
