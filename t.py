@@ -119,6 +119,7 @@ class travian(object):
         if isNightTime:
             sleepDelay = randint(9000,15000)
         constructionFinishTimes = self.getAllConstructionFinishTimes()
+        constructionFinishTimes.sort()
         for constructionFinishTime in constructionFinishTimes:
             constructionFinishDelay = constructionFinishTime - time.time()
             if constructionFinishDelay < sleepDelay*1.4 and constructionFinishDelay > sleepDelay*0.4:
