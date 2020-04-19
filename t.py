@@ -28,9 +28,9 @@ def mergeDict(d1,d2):
     return ret
 def doOnceInSeconds(delay,function,function_name,*args):
     if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=doneTasksDelay[function_name])<datetime.datetime.now():
+        function(*args)
         doneTasks[function_name] = datetime.datetime.now()
         doneTasksDelay[function_name] = delay
-        function(*args)
 def getResourceData(html):
     productionCompile = re.compile('"l[1-4]":\s(-?\d*)')
     prs = productionCompile.findall(html)
@@ -508,8 +508,10 @@ class travian(object):
         return globalMinResourceFieldLevel
 
     def getVillageCheckPeriod(self, vid):
-        if  self.getMinResourceFieldLevel(vid) < 3:
+        if self.getMinResourceFieldLevel(vid) < 3:
             return 600
+        if self.getMinResourceFieldLevel(vid) < 7:
+            return 900
         return 1500
 
     def buildFindMinFieldCrop(self, vid):
