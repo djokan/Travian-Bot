@@ -508,11 +508,15 @@ class travian(object):
         return globalMinResourceFieldLevel
 
     def getVillageCheckPeriod(self, vid):
+        minConstructionFinishDelay = 1500
+        if 'constructionFinishTimes' in self.config['villages'][vid]:
+            for constructionFinishTime in self.config['villages'][vid]['constructionFinishTimes']:
+                minConstructionFinishDelay = min(minConstructionFinishDelay, constructionFinishTime - time.time())
         if self.getMinResourceFieldLevel(vid) < 3:
-            return 600
+            return min(600, minConstructionFinishDelay)
         if self.getMinResourceFieldLevel(vid) < 7:
-            return 900
-        return 1500
+            return min(900, minConstructionFinishDelay)
+        return min(1500, minConstructionFinishDelay)
 
     def buildFindMinFieldCrop(self, vid):
         data=self.config['villages'][vid]
