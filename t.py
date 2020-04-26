@@ -11,7 +11,7 @@ from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
 doneTasksDelay = {}
-def getConstructionFinishTimes(html):
+def parseConstructionFinishTimes(html):
     parser = BeautifulSoup(html, "html5lib")
     constructionTimeFields = parser.find_all('div', {'class': 'buildDuration'})
     constructionFinishTimes = []
@@ -31,7 +31,7 @@ def doOnceInSeconds(delay,function,function_name,*args):
         function(*args)
         doneTasks[function_name] = datetime.datetime.now()
         doneTasksDelay[function_name] = delay
-def getResourceData(html):
+def parseResourceData(html):
     productionCompile = re.compile('"l[1-4]":\s(-?\d*)')
     prs = productionCompile.findall(html)
     for i in range(len(prs)):
@@ -547,7 +547,7 @@ class travian(object):
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
 
-        data = mergeDict(data, getResourceData(html))
+        data = mergeDict(data, parseResourceData(html))
 
         return data
 
@@ -560,9 +560,9 @@ class travian(object):
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
         
-        data = mergeDict(data, getResourceData(html))
+        data = mergeDict(data, parseResourceData(html))
 
-        data['constructionFinishTimes'] = getConstructionFinishTimes(html)
+        data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
     def analysisDorf1(self,html):
@@ -602,9 +602,9 @@ class travian(object):
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
 
-        data = mergeDict(data, getResourceData(html))
+        data = mergeDict(data, parseResourceData(html))
 
-        data['constructionFinishTimes'] = getConstructionFinishTimes(html)
+        data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
     def getConfig(self, shutdownIfError):
