@@ -10,7 +10,6 @@ import random
 from random import randint
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
-doneTasksDelay = {}
 def parseConstructionFinishTimes(html):
     parser = BeautifulSoup(html, "html5lib")
     constructionTimeFields = parser.find_all('div', {'class': 'buildDuration'})
@@ -27,10 +26,9 @@ def mergeDict(d1,d2):
         ret[e] = d2[e]
     return ret
 def doOnceInSeconds(delay,function,function_name,*args):
-    if not function_name in doneTasks or doneTasks[function_name]+datetime.timedelta(seconds=doneTasksDelay[function_name])<datetime.datetime.now():
-        function(*args)
-        doneTasks[function_name] = datetime.datetime.now()
-        doneTasksDelay[function_name] = delay
+    if not function_name in doneTasks or doneTasks[function_name] < time.time():
+        if function(*args) == True:
+            doneTasks[function_name] = time.time() + delay
 def parseResourceData(html):
     productionCompile = re.compile('"l[1-4]":\s(-?\d*)')
     prs = productionCompile.findall(html)
@@ -200,6 +198,7 @@ class travian(object):
     def holdSmallCelebration(self, vid):
         print('Hold Small Celebration village ' + vid)
         html = self.goToBuildingByName(vid, 'Town Hall','a=1&')
+        return True
 
     def sendResources(self, vid, x, y, r1, r2, r3, r4, sendifNotEnough):
         html = self.goToBuildingByName(vid, 'Marketplace','t=5&')
@@ -209,7 +208,7 @@ class travian(object):
         cancarry = int(cancarry)
         print('Available merchants:' + str(available))
         if sendifNotEnough==False and int(r1) + int(r2) + int(r3) + int(r4) > available*cancarry:
-            return
+            return False
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
             r1 = int(int(r1)*coeff)
@@ -238,7 +237,7 @@ class travian(object):
         print('Trying to send ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
             print('resource amount is too small')
-            return
+            return False
         data = getFirstMarketplaceData(html)
         print('Sending resources from ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         data['r1'] = r1
@@ -254,7 +253,7 @@ class travian(object):
         oldhtml = html
         if 'allowed' in oldhtml:
             print('Exceeded sending resource amount to this player!')
-            return
+            return False
         data = getSecondMarketplaceData(html)
         data['r1'] = r1
         data['r2'] = r2
@@ -268,6 +267,8 @@ class travian(object):
             print(olddata)
             print('MarketDebugInfo2:')
             print(data)
+            return False
+        return True
 
     def goToBuildingByName(self, vid, name, linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid=' + vid)
@@ -280,9 +281,10 @@ class travian(object):
         data=getAdventureData(html)
         for key in data:
             if data[key]==None:
-                return
+                return False
         print(data)
         html=self.sendRequest(self.config['server']+'start_adventure.php',data)
+        return True
 
     def checkVillages(self):
         for vid in self.config['villages']:
@@ -373,6 +375,7 @@ class travian(object):
             print('sleeping for ' + str(tempDelay) + " seconds")
             time.sleep(tempDelay)
             self.buildBuilding(vid)
+        return True
 
     def resourceFieldLevelsSum(self, vid):
         data=self.config['villages'][vid]
@@ -612,9 +615,10 @@ class travian(object):
         data['a'] = getRegexValue(html,'value="([^"]*)" name="a" id="btn_ok"')
         for key in data:
             if data[key] == None:
-                return
+                return False
         print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
         self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data)
+        return True
 
     def analysisBuild(self,html):
         data={}
