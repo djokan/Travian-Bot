@@ -49,6 +49,38 @@ def getAdventureData(html):
     for name in names:
         data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
     return data
+def getAttackData(html):
+    data = {}
+    names = ["timestamp","timestamp_checksum","b"]
+    for name in names:
+        data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
+    return data
+
+def getAttackData2(html):
+    data = {}
+    names = ["timestamp","timestamp_checksum","id","w","c","kid"]
+    names.append('troops\[0\]\[t1\]')
+    names.append('troops\[0\]\[t2\]')
+    names.append('troops\[0\]\[t3\]')
+    names.append('troops\[0\]\[t4\]')
+    names.append('troops\[0\]\[t5\]')
+    names.append('troops\[0\]\[t6\]')
+    names.append('troops\[0\]\[t7\]')
+    names.append('troops\[0\]\[t8\]')
+    names.append('troops\[0\]\[t9\]')
+    names.append('troops\[0\]\[t10\]')
+    if 'troops[0][t11]' in html:
+        names.append('troops\[0\]\[t11\]')
+    names.append("currentDid")
+    names.append("b")
+    names.append("dname")
+    names.append("x")
+    names.append("y")
+    for name in names:
+        key = name.replace('\\','')
+        data[key] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
+    return data
+
 def getFirstMarketplaceData(html):
     data = {}
     names = ["id","t"]
@@ -536,6 +568,53 @@ class travian(object):
         if desiredFieldIndex < 18: #it always less then 18
             return desiredFieldIndex+1;
         return False;
+
+    # attackData = {'vid' : xxx, 'troops' : [xx, xx, xx, ...], 'sendHero'(optional) : True/False, 'villageName'(optional): '', 'x'(optional): xx, 'y'(optional): xx, 'type' : 'raid'/'normal'}
+    def attack(self, attackData):
+
+        html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39')
+
+        data = getAttackData(html)
+        data['currentDid'] = attackData['vid']
+        for i in [1, 4, 7, 9, 2, 5, 8, 10, 3, 6]:
+            if (attackData['troops'][i - 1] > 0):
+                data['troops[0][t' + str(i) + ']'] = str(attackData['troops'][i - 1])
+            else:
+                data['troops[0][t' + str(i) + ']'] = ''
+        if 'troops[0][t11]' in html:
+            if 'sendHero' in attackData and attackData['sendHero'] == True:
+                data['troops[0][t11]'] = '1'
+            else:
+                data['troops[0][t11]'] = ''
+        if 'villageName' in attackData:
+            data['dname'] = attackData['villageName']
+        else:
+            data['dname'] = ''
+        if 'x' in attackData:
+            data['x'] = attackData['x']
+        else:
+            data['x'] = ''
+        if 'y' in attackData:
+            data['y'] = attackData['y']
+        else:
+            data['y'] = ''
+        if attackData['type'] == 'raid':
+            data['c'] = '4'
+        else:
+            data['c'] = '3' # normal
+        data['s1'] = 'ok'
+        html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data)
+        time.sleep(randint(3,5))
+
+        data = {}
+        data['redeployHero'] = ''
+        data = mergeDict(data, getAttackData2(html))
+        data['a'] = getRegexValue(html,'value="([^"]*)" name="a" id="btn_ok"')
+        for key in data:
+            if data[key] == None:
+                return
+        print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
+        self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data)
 
     def analysisBuild(self,html):
         data={}
