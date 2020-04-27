@@ -8,6 +8,8 @@
   },
   "headers": {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:61.0) Gecko/20100101 Firefox/61.0"
+        # It is highly recommended to go to link: https://pgl.yoyo.org/http/browser-headers.php
+        # and copy User-Agent to this field.
   },
   "autoAdventure": "true", # send hero to adventure
   "villages": {
