@@ -390,8 +390,7 @@ class travian(object):
         build=False
         for i in range( len(self.config['villages'][vid]['building']  )):
             buildingId = self.config['villages'][vid]['building'][i]
-            if 'dorf2html' not in self.config['villages'][vid]:
-                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
+            self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
             targetLevel = self.config['villages'][vid]['buildinglvl'][i]
             if (buildingId==0 and self.resourceFieldLevelsSum(vid) < targetLevel) or (buildingId>0 and self.getBuildingLvl(vid, buildingId) < targetLevel):
                 build=True
