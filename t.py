@@ -8,6 +8,8 @@ import traceback
 import subprocess
 import random
 from random import randint
+import os.path
+from os import path
 WAREHOUSECOEFF = 0.8
 doneTasks = {}
 def parseConstructionFinishTimes(html):
@@ -35,12 +37,20 @@ def parseResourceData(html):
     for i in range(len(prs)):
         prs[i] = int(prs[i])
     return {'production': prs[0:4], 'availableResources' : prs[4:8], 'capacity' : prs[8:12]}
-def getRegexValue(stringFrom,regex):
+
+def getRegexValues(stringFrom, regex):
     try:
         idbCompile=re.compile(regex,re.S)
-        return idbCompile.findall(stringFrom)[0]
+        return idbCompile.findall(stringFrom)
     except:
         return None
+
+def getRegexValue(stringFrom,regex):
+    temp = getRegexValues(stringFrom, regex)
+    if temp == None:
+        return None
+    else:
+        return temp[0]
 def getAdventureData(html):
     data = {}
     names = ["send","kid","from","a"]
@@ -96,8 +106,24 @@ def getSecondMarketplaceData(html):
     data['cmd']='prepareMarketplace'
     data['x2']='1'
     return data
-
-
+def getBattleLinks(html):
+    temp = getRegexValues(html,'(berichte.php[^"]*t=\\d*&s=\\d*)"')
+    for i in range(len(temp)):
+        temp[i] = 	temp[i].replace("&amp;","&")
+    return temp
+def getNextBattlePage(html):
+    exist = getRegexValue(html,'next page[^>]*>')
+    if 'next disabled' in exist:
+        return None
+    pages = getRegexValues(html,'(berichte.php.t=\\d*&amp;page=\\d*)"')
+    return pages[len(pages) - 2].replace("&amp;","&")
+def getBattleId(url):
+    return getRegexValue(url,'id=([^%]*)%')
+def getVillageCoordinatesFromD(d):
+    coords = {}
+    coords['x'] = (d-1)%801 - 400
+    coords['y'] = 400 - (int((d-1)/801))
+    return coords
 class travian(object):
     def __init__(self):
         self.RequestedResources = {}
@@ -112,6 +138,7 @@ class travian(object):
             try:
                 if self.loggedIn==False:
                     self.login()
+                self.readOffensiveReports()
                 self.checkVillages()
                 self.printProductionData()
             except Exception as e:
@@ -128,6 +155,76 @@ class travian(object):
                 pass
             print('Woke up!')
             time.sleep(1)
+
+    def readOffensiveReports(self):
+        nextBattlePage = 'berichte.php?t=1'
+        if 'reports' not in self.config:
+            self.readReportsFile()
+        while True:
+            time.sleep(0.1*randint(10,30))
+            html = self.sendRequest(self.config['server'] + nextBattlePage, {}, False)
+
+            battles = getBattleLinks(html)
+
+            foundExistingReport = False
+            for battle in battles:
+                if getBattleId(battle) in self.config['reports']:
+                    foundExistingReport = True
+                    break
+                time.sleep(0.01*randint(10,50))
+                self.readBattleReport(battle)
+            if foundExistingReport:
+                break
+
+            nextBattlePage = getNextBattlePage(html)
+            if nextBattlePage == None:
+                break
+        self.saveReportsFile()
+
+    def readBattleReport(self, battle):
+
+        html = self.sendRequest(self.config['server'] + battle, {}, False)
+        report = {}
+
+        troops = getRegexValues(html,'class="unit[^>]*>\\d+</td>')
+
+        lastIndexes = []
+
+        for i in range(len(troops)):
+            if 'last' in troops[i]:
+                lastIndexes.append(i+1)
+        report['source'] = {}
+        report['source']['sent'] = []
+        report['source']['dead'] = []
+        report['destination'] = {}
+        report['destination']['sent'] = []
+        report['destination']['dead'] = []
+
+        for i in range(0, lastIndexes[0]):
+            report['source']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+        for i in range(lastIndexes[0], lastIndexes[1]):
+            report['source']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+        for i in range(lastIndexes[1], lastIndexes[2]):
+            report['destination']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+        for i in range(lastIndexes[2], lastIndexes[3]):
+            report['destination']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+
+        villages = getRegexValues(html,'karte.php.d=(\\d*)"')
+
+        report['source'] = mergeDict(report['source'], getVillageCoordinatesFromD(int(villages[0])))
+        report['destination'] = mergeDict(report['destination'], getVillageCoordinatesFromD(int(villages[1])))
+
+        lost = getRegexValues(html,'resources_medium">[^&]*&#x202d;([^&]*)&')
+        report['source']['lost'] = int(lost[0].replace(',',''))
+        report['destination']['lost'] = int(lost[1].replace(',',''))
+
+
+        stolen = getRegexValue(html,'title="carry" />&#x202d;&#x202d;(\\d*)&')
+        report['stolen'] = int(stolen)
+        capacity = getRegexValue(html,'title="carry" />&#x202d;&#x202d;\\d*&#x202c;/&#x202d;(\\d*)&')
+        report['capacity'] = int(capacity)
+
+        self.config['reports'][getBattleId(battle)] = report
 
     def getNextSleepDelay(self):
         now = datetime.datetime.now()
@@ -689,6 +786,18 @@ class travian(object):
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
+    def readReportsFile(self):
+        if not path.exists('reports.json'):
+            f = open('reports.json', "w")
+            f.write("{}")
+            f.close()
+        with open('reports.json','r+') as reportsFile:
+            self.config['reports'] = json.load(reportsFile)
+
+    def saveReportsFile(self):
+        with open('reports.json', 'w') as reportsFile:
+            json.dump(self.config['reports'], reportsFile)
+
     def getConfig(self, shutdownIfError):
         try:
             with open('config.json','r+') as configFile:
@@ -755,8 +864,9 @@ class travian(object):
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
 
-    def sendRequest(self,url,data={}):
-        time.sleep(randint(1,5))
+    def sendRequest(self, url, data={}, delay=True):
+        if delay:
+            time.sleep(randint(1,5))
         html = None
         try:
             if len(data) == 0:
