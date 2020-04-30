@@ -186,6 +186,14 @@ class travian(object):
         html = self.sendRequest(self.config['server'] + battle, {}, False)
         report = {}
 
+        report['type'] = int(getRegexValue(battle, 't=(\\d+)[^\\d]'))
+
+        date = getRegexValue(html, '<div class="time">[^>]*>([^<]*)<')
+
+        timestamp = int(time.mktime(datetime.datetime.strptime(date, "%d.%m.%y, %H:%M:%S").timetuple()))
+
+        report['timestamp'] = timestamp
+
         troops = getRegexValues(html,'class="unit[^>]*>\\d+</td>')
 
         lastIndexes = []
