@@ -7,11 +7,32 @@ import datetime
 import traceback
 import subprocess
 import random
+import numpy
+import math
 from random import randint
 import os.path
 from os import path
 WAREHOUSECOEFF = 0.8
-doneTasks = {}
+troopSpeed = [6, 6, 6, 6, 6, 6, 6, 6, 6, 6]
+def parseVillageCoordinates(html):
+    data = {}
+    temp = getRegexValue(html, 'newdid=(\\d+)[^\\d].{,20}class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
+    data['x'] = int(temp[2])
+    data['y'] = int(temp[4])
+    return data
+
+def readDictionaryFromJson(filename):
+    if not path.exists(filename):
+        f = open(filename, "w")
+        f.write("{}")
+        f.close()
+    with open(filename,'r+') as reportsFile:
+        return json.load(reportsFile)
+
+def saveDictionaryToJson(dict, filename):
+    with open(filename, 'w') as file:
+        json.dump(dict, file)
+
 def parseConstructionFinishTimes(html):
     parser = BeautifulSoup(html, "html5lib")
     constructionTimeFields = parser.find_all('div', {'class': 'buildDuration'})
@@ -27,12 +48,9 @@ def mergeDict(d1,d2):
     for e in d2:
         ret[e] = d2[e]
     return ret
-def doOnceInSeconds(delay,function,function_name,*args):
-    if not function_name in doneTasks or doneTasks[function_name] < time.time():
-        if function(*args) == True:
-            doneTasks[function_name] = time.time() + delay
+
 def parseResourceData(html):
-    productionCompile = re.compile('"l[1-4]":\s(-?\d*)')
+    productionCompile = re.compile('"l[1-4]":\\s(-?\\d*)')
     prs = productionCompile.findall(html)
     for i in range(len(prs)):
         prs[i] = int(prs[i])
@@ -67,18 +85,18 @@ def getAttackData(html):
 def getAttackData2(html):
     data = {}
     names = ["timestamp","timestamp_checksum","id","w","c","kid"]
-    names.append('troops\[0\]\[t1\]')
-    names.append('troops\[0\]\[t2\]')
-    names.append('troops\[0\]\[t3\]')
-    names.append('troops\[0\]\[t4\]')
-    names.append('troops\[0\]\[t5\]')
-    names.append('troops\[0\]\[t6\]')
-    names.append('troops\[0\]\[t7\]')
-    names.append('troops\[0\]\[t8\]')
-    names.append('troops\[0\]\[t9\]')
-    names.append('troops\[0\]\[t10\]')
+    names.append('troops\\[0\\]\\[t1\\]')
+    names.append('troops\\[0\\]\\[t2\\]')
+    names.append('troops\\[0\\]\\[t3\\]')
+    names.append('troops\\[0\\]\\[t4\\]')
+    names.append('troops\\[0\\]\\[t5\\]')
+    names.append('troops\\[0\\]\\[t6\\]')
+    names.append('troops\\[0\\]\\[t7\\]')
+    names.append('troops\\[0\\]\\[t8\\]')
+    names.append('troops\\[0\\]\\[t9\\]')
+    names.append('troops\\[0\\]\\[t10\\]')
     if 'troops[0][t11]' in html:
-        names.append('troops\[0\]\[t11\]')
+        names.append('troops\\[0\\]\\[t11\\]')
     names.append("currentDid")
     names.append("b")
     names.append("dname")
@@ -96,7 +114,7 @@ def getFirstMarketplaceData(html):
         data[name] = getRegexValue(html,'name="'+name+'"[^>]+value="([^"]*)"')
     data['cmd']='prepareMarketplace'
     data['x2']='1'
-    data['ajaxToken']=getRegexValue(html,'return \'([a-z\d]{32})\';')
+    data['ajaxToken']=getRegexValue(html,'return \'([a-z\\d]{32})\';')
     return data
 def getSecondMarketplaceData(html):
     data = {}
@@ -131,13 +149,17 @@ class travian(object):
         self.getConfig(True) # shutdown if error
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
+        self.startingTimestamp = time.time()
         self.loggedIn=False
+        self.doneTasks = readDictionaryFromJson('doOnceInSeconds.json')
+        self.adventureExists = False
         self.login()
         while 1:
             self.getConfig(False) # don't shutdown if error
             try:
                 if self.loggedIn==False:
                     self.login()
+
                 self.readOffensiveReports()
                 self.checkVillages()
                 self.printProductionData()
@@ -155,6 +177,15 @@ class travian(object):
                 pass
             print('Woke up!')
             time.sleep(1)
+
+    def doOnceInSeconds(self, delay, function, function_name, *args):
+        if not function_name in self.doneTasks or self.doneTasks[function_name] < time.time():
+            if function(*args) == True:
+                self.doneTasks[function_name] = time.time() + delay
+                saveDictionaryToJson(self.doneTasks, 'doOnceInSeconds.json')
+            else:
+                return False
+        return True
 
     def readOffensiveReports(self):
         nextBattlePage = 'berichte.php?t=1'
@@ -279,13 +310,12 @@ class travian(object):
         cropProduction=0
         allProduction=0
         for vid in self.config['villages']:
-            villageData=self.config['villages'][vid]
             production=None
             try:
-                villageProduction = villageData['production']
+                villageProduction = self.config['villages'][vid]['production']
             except Exception as e:
                 self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
-                villageProduction = villageData['production']
+                villageProduction = self.config['villages'][vid]['production']
             print('Village: ' + vid + ' resource fields level sum - ' + str(self.resourceFieldLevelsSum(vid)))
             woodProduction+=villageProduction[0]
             clayProduction+=villageProduction[1]
@@ -307,9 +337,9 @@ class travian(object):
 
     def sendResources(self, vid, x, y, r1, r2, r3, r4, sendifNotEnough):
         html = self.goToBuildingByName(vid, 'Marketplace','t=5&')
-        available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\d+)')
+        available = getRegexValue(html,'class="merchantsAvailable">&#x202d;(\\d+)')
         available = int(available)
-        cancarry = getRegexValue(html,'can carry <b>(\d+)<\/b>')
+        cancarry = getRegexValue(html,'can carry <b>(\\d+)<\\/b>')
         cancarry = int(cancarry)
         print('Available merchants:' + str(available))
         if sendifNotEnough==False and int(r1) + int(r2) + int(r3) + int(r4) > available*cancarry:
@@ -377,7 +407,7 @@ class travian(object):
 
     def goToBuildingByName(self, vid, name, linkdata):
         html=self.sendRequest(self.config['server']+'dorf2.php?newdid=' + vid)
-        idb = getRegexValue(html,'build.php\?id=(\d+)\'" title="'+name)
+        idb = getRegexValue(html,'build.php\\?id=(\\d+)\'" title="'+name)
         return self.sendRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
 
     def autoAdventure(self):
@@ -394,17 +424,18 @@ class travian(object):
     def checkVillages(self):
         for vid in self.config['villages']:
             checkPeriod = self.getVillageCheckPeriod(vid)
-            doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
+            self.doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
-            doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
+            self.doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
         self.sendRequestedResources(vid)
 
     def checkVillage(self, vid):
         html=self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
         data=self.config['villages'][vid]
-
+        if 'autoFarming' in self.config['villages'][vid] and self.config['villages'][vid]['autoFarming'] == 'true':
+            self.farm(vid)
         if ('smallCelebration' in self.config['villages'][vid]) and self.config['villages'][vid]['smallCelebration'] == 'true':
-            doOnceInSeconds(randint(3000,4000), self.holdSmallCelebration, 'holdSmallCelebration' + vid, vid)
+            self.doOnceInSeconds(randint(3000,4000), self.holdSmallCelebration, 'holdSmallCelebration' + vid, vid)
         if ('push' in self.config['villages'][vid]) and len(self.config['villages'][vid]['push']) == 2:
             pushCoordinates=self.config['villages'][vid]['push']
             pushResourcesAndPeriod=self.config['villages'][vid]['pushparams']
@@ -429,7 +460,7 @@ class travian(object):
                     pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
             if (sendingSum >= self.getMinMarketTreshold()):
-                doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid, vid, pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
+                self.doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid, vid, pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
         if ('requestResourcesFrom' in self.config['villages'][vid]) and len(self.config['villages'][vid]['requestResourcesFrom']) > 0:
             availableResources=data['availableResources']
             
@@ -440,7 +471,7 @@ class travian(object):
                 if (capacity[i]*(WAREHOUSECOEFF-0.1)>availableResources[i]):
                     send[i] = capacity[i]*WAREHOUSECOEFF-availableResources[i]
                     send[i] = int(send[i])/len(self.config['villages'][vid]['requestResourcesFrom'])
-                    send[i] = send[i] - send[i]%100
+                    send[i] = int(send[i]) - int(send[i])%100
                 else:
                     send[i] = 0
                 sendingSum = sendingSum + send[i]
@@ -482,7 +513,98 @@ class travian(object):
             self.buildBuilding(vid)
         return True
 
+    def travelTime(self, vid, farm):
+        return math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/6
+
+    def calculateFarmPeriods(self, vid, farms):
+
+        for farm in farms:
+            if (not 'period' in farm) or farm['period'] == -1:
+                farm['period'] = self.travelTime(vid, farm)
+        for reportKey in self.config['reports']:
+            report = self.config['reports'][reportKey]
+
+            if report['timestamp'] > time.time() - 20 * 3600: # 20 hours
+                print(report)
+                for farm in farms:
+                    if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+                        if 'stolen' not in farm:
+                            farm['stolen'] = 0
+                            farm['capacity'] = 0
+                            farm['attacksNumber'] = 0
+                        farm['stolen'] += report['stolen']
+                        farm['capacity'] += report['capacity']
+                        farm['attacksNumber'] += 1
+        
+        avgCoefficient = 0
+        numOfCoefficients = 0
+        for farm in farms:
+            if 'stolen' in farm:
+                farm['coefficient'] = 0.0000000001 + farm['stolen'] / (self.travelTime(vid, farm) * farm['attacksNumber'])
+                if farm['stolen']/farm['capacity'] > 0.9:
+                    farm['coefficient'] *= 1.1
+                farm['period'] /= farm['coefficient']
+                avgCoefficient += farm['coefficient']
+                numOfCoefficients += 1
+        if numOfCoefficients > 0:
+            avgCoefficient /= numOfCoefficients
+        else:
+            avgCoefficient = 1
+        for farm in farms:
+            if 'stolen' not in farm:
+                farm['coefficient'] = avgCoefficient
+                farm['period'] /= farm['coefficient']
+
+        farms = sorted(farms, key = lambda i: i['period'])
+
+        numberOfFarms = len(farms)
+        while farms[numberOfFarms - 1]['period'] > 12*3600:
+            numberOfFarms -= 1
+            self.alignPeriod(vid, farms, numberOfFarms)
+        for farm in farms:
+            farm['period'] = int(farm['period'])
+            del farm['coefficient']
+        return True
+
+    def alignPeriod(self, vid, farms, numberOfFarms):
+        troopsNeeded = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        for i in range(numberOfFarms):
+            farm = farms[i]
+            troopsNeeded = numpy.add(troopsNeeded, numpy.multiply(self.config['villages'][vid]['farmTroops'], self.travelTime(vid, farm) / farm['period']))
+        troopsNeeded = troopsNeeded.tolist()
+
+        periodAlign = 0
+        for i in range(len(troopsNeeded)):
+            if self.config['villages'][vid]['troopCapacity'][i] > 0:
+                periodAlign = max(periodAlign, troopsNeeded[i]/self.config['villages'][vid]['troopCapacity'][i])
+
+        for farm in farms:
+            farm['period'] *= periodAlign
+
+    def farm(self, vid):
+        self.readFarmsFile(vid)
+        self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid, self.config['villages'][vid]['farms'])
+        for farm in self.config['villages'][vid]['farms']:
+            if farm['period'] > 12 * 3600:
+                continue
+            attackData = {}
+            attackData['vid'] = vid
+            attackData['troops'] = self.config['villages'][vid]['farmTroops']
+            attackData['x'] = farm['x']
+            attackData['y'] = farm['y']
+            attackData['type'] = 'raid'
+            print('attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')')
+            print(farm['period'])
+            if not self.doOnceInSeconds(farm['period'], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
+                if not self.doesHaveEnoughTroops(vid, attackData['troops']):
+                    break
+        self.saveFarmsFile(vid)
+
     def resourceFieldLevelsSum(self, vid):
+
+        if 'fieldsList' not in self.config['villages'][vid]:
+            self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid)
+
         data=self.config['villages'][vid]
         fieldsList=data['fieldsList']
 
@@ -499,7 +621,7 @@ class travian(object):
             targetLevel = self.config['villages'][vid]['buildinglvl'][i]
             if (buildingId==0 and self.resourceFieldLevelsSum(vid) < targetLevel) or (buildingId>0 and self.getBuildingLvl(vid, buildingId) < targetLevel):
                 build=True
-                break;
+                break
         if build:
             if buildingId == 0:
                 self.buildResourceField(vid, 'resource')
@@ -513,10 +635,10 @@ class travian(object):
             html = self.config['villages'][vid]['dorf1html']
         else:
             html = self.config['villages'][vid]['dorf2html']
-        if getRegexValue(html,'build\.php\?id='+str(buildingId)+'[^L]*Level (\d+)[^\d]') == None:
+        if getRegexValue(html,'build\\.php\\?id='+str(buildingId)+'[^L]*Level (\\d+)[^\\d]') == None:
             print('There is no building on field ' + str(buildingId))
             return 30
-        return int(getRegexValue(html,'build\.php\?id='+str(buildingId)+'[^L]*Level (\d+)[^\d]'))
+        return int(getRegexValue(html,'build\\.php\\?id='+str(buildingId)+'[^L]*Level (\\d+)[^\\d]'))
         
     def sendRequestedResources(self, vid):
         for vid in self.RequestedResources:
@@ -527,7 +649,7 @@ class travian(object):
             except Exception as e:
                 self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources = self.config['villages'][vid]['availableResources']
-            if 'holdResources' in self.config['villages'][vid]:
+            if ('holdResources' in self.config['villages'][vid]) and len(self.config['villages'][vid]['holdResources']) == 4:
                 for i in range(4):
                     tmprs = availableResources[i]
                     availableResources[i]= availableResources[i] - self.config['villages'][vid]['holdResources'][i] + randint(1,2000)-1000
@@ -550,7 +672,7 @@ class travian(object):
             r4 = str(self.RequestedResources[vid][4])
             period = self.RequestedResources[vid][5]
 
-            doOnceInSeconds(period, self.sendResources, 'sendResources[' + vid + ']->' + to, vid, self.config['villages'][to]['x'], self.config['villages'][to]['y'], r1, r2, r3, r4, True)
+            self.doOnceInSeconds(period, self.sendResources, 'sendResources[' + vid + ']->' + to, vid, self.config['villages'][to]['x'], self.config['villages'][to]['y'], r1, r2, r3, r4, True)
         self.RequestedResources = {}
 
     def buildResourceField(self, vid, type):
@@ -580,7 +702,7 @@ class travian(object):
                     return False
             except:
                 return False
-            m = re.search('(?<=&amp;c=)(\w+)', html)
+            m = re.search('(?<=&amp;c=)(\\w+)', html)
         #maybe not enough resource.
         except:
             return False
@@ -599,7 +721,7 @@ class travian(object):
         buildableResourceTypes=[]
         for i in range(len(fieldsList)):
             if fieldsList[i]['level'] <10:
-                buildableFieldList[i] = fieldsList[i];
+                buildableFieldList[i] = fieldsList[i]
                 if fieldsList[i]['gid'] not in buildableResourceTypes:
                     buildableResourceTypes.append(fieldsList[i]['gid'])
 
@@ -624,8 +746,8 @@ class travian(object):
                     desiredFieldIndex = i
 
         if desiredFieldIndex < 18: #it always less then 18
-            return desiredFieldIndex+1;
-        return False;
+            return desiredFieldIndex+1
+        return False
 
     def getMinResourceFieldLevel(self, vid):
         data=self.config['villages'][vid]
@@ -673,13 +795,22 @@ class travian(object):
                     desiredFieldIndex=i
 
         if desiredFieldIndex < 18: #it always less then 18
-            return desiredFieldIndex+1;
-        return False;
+            return desiredFieldIndex+1
+        return False
+
+    def doesHaveEnoughTroops(self, vid, troopsToSend):
+        for i in range(len(troopsToSend)):
+            if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
+                return False
+        return True
 
     # attackData = {'vid' : xxx, 'troops' : [xx, xx, xx, ...], 'sendHero'(optional) : True/False, 'villageName'(optional): '', 'x'(optional): xx, 'y'(optional): xx, 'type' : 'raid'/'normal'}
     def attack(self, attackData):
 
-        html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39')
+        html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False, attackData['vid'])
+
+        if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops']):
+            return False
 
         data = getAttackData(html)
         data['currentDid'] = attackData['vid']
@@ -710,8 +841,11 @@ class travian(object):
         else:
             data['c'] = '3' # normal
         data['s1'] = 'ok'
-        html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data)
-        time.sleep(randint(3,5))
+        html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
+        time.sleep(0.1*randint(3, 6))
+        if 'There is no village at these coordinates.' in html and 'farms' in self.config['villages'][attackData['vid']]:
+            self.config['villages'][attackData['vid']]['farms'] = [farm for farm in self.config['villages'][attackData['vid']]['farms'] if attackData['x'] != farm['x'] or attackData['y'] != farm['y']]
+            return False
 
         data = {}
         data['redeployHero'] = ''
@@ -719,17 +853,27 @@ class travian(object):
         data['a'] = getRegexValue(html,'value="([^"]*)" name="a" id="btn_ok"')
         for key in data:
             if data[key] == None:
+                print(html)
+                print('attacking failed')
                 return False
         print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
-        self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data)
+        self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
+        time.sleep(0.1*randint(3, 6))
         return True
 
-    def analysisBuild(self,html):
+    def analysisSendTroops(self, html):
+        data = {}
+        troops = getRegexValues(html, 'troops\\[0\\]\\[t\\d+\\]"[^<]*<[^>]*>&#x202d;([^&]*)&')
+        troops = [int(troop) for troop in troops]
+        data['availableTroops'] = troops
+        return data
+
+    def analysisBuild(self, html):
         data={}
         if not html:
             return False
         parser = BeautifulSoup(html, "html5lib")
-        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\\.\\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
@@ -742,12 +886,14 @@ class travian(object):
         data={}
         if not html:
             return False
-        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\\.\\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
         
         data = mergeDict(data, parseResourceData(html))
+
+        data = mergeDict(data, parseVillageCoordinates(html))
 
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
@@ -779,32 +925,35 @@ class travian(object):
             newFieldList[i] = {'gid':int(gid)-1,'level':int(level)}
         data['fieldsList'] = newFieldList
         self.adventureExists = False
-        productionCompile = re.compile('class="content">(\d+)<',re.S)
+        productionCompile = re.compile('class="content">(\\d+)<',re.S)
         prs = productionCompile.findall(html)
         if len(prs)>0:
             if int(prs[0])>0:
                 self.adventureExists = True
-        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\.\d]*)')
+        productionCompile=re.compile('stockBarFreeCrop" class="value">&#x202d;([\\.\\d]*)')
         prs = productionCompile.findall(html)
         for i in range(len(prs)):
             data['stockBarFreeCrop']=int(prs[i].replace(".",""))
 
         data = mergeDict(data, parseResourceData(html))
 
+        data = mergeDict(data, parseVillageCoordinates(html))
+
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
+    def readFarmsFile(self, vid):
+        self.config['villages'][vid]['farms'] = readDictionaryFromJson('farms_' + vid + '.json')['farms']
+
+    def saveFarmsFile(self, vid):
+        saveDictionaryToJson({'farms': self.config['villages'][vid]['farms']}, 'farms_' + vid + '.json')
+
     def readReportsFile(self):
-        if not path.exists('reports.json'):
-            f = open('reports.json', "w")
-            f.write("{}")
-            f.close()
-        with open('reports.json','r+') as reportsFile:
-            self.config['reports'] = json.load(reportsFile)
+        self.config['reports'] = readDictionaryFromJson('reports.json')
 
     def saveReportsFile(self):
-        with open('reports.json', 'w') as reportsFile:
-            json.dump(self.config['reports'], reportsFile)
+        saveDictionaryToJson(self.config['reports'], 'reports.json')
+
 
     def getConfig(self, shutdownIfError):
         try:
@@ -867,12 +1016,12 @@ class travian(object):
         villageVids = villageVidsCompile.findall(html)
         villageAmount = len(villageVids)
         
-        ajaxTokenCompile=re.compile('ajaxToken\s*=\s*\'(\w+)\'')
+        ajaxTokenCompile=re.compile('ajaxToken\\s*=\\s*\'(\\w+)\'')
         ajaxToken = ajaxTokenCompile.findall( html)[0]
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
 
-    def sendRequest(self, url, data={}, delay=True):
+    def sendRequest(self, url, data={}, delay=True, vid="-1"):
         if delay:
             time.sleep(randint(1,5))
         html = None
@@ -908,8 +1057,9 @@ class travian(object):
                         #log.error('Could not relogin %d time' %reconnects)
                         print(('Could not relogin %d time' %reconnects))
                         time.sleep(randint(1,5))
-        if 'newdid=' in url:
-            vid = getRegexValue(url,'newdid=(\d+)')
+        if 'newdid=' in url or vid != "-1":
+            if vid == "-1":
+                vid = getRegexValue(url,'newdid=(\\d+)')
             data = {}
             if 'dorf1.php' in url:
                 data = self.analysisDorf1(html.text)
@@ -919,6 +1069,8 @@ class travian(object):
                 self.config['villages'][vid]['dorf2html']=html.text
             if 'build.php' in url:
                 data = self.analysisBuild(html.text)
+            if 'build.php?tt=2&id=39' in url:
+                data = self.analysisSendTroops(html.text)
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
@@ -929,4 +1081,4 @@ subprocess.check_output("git stash pop", shell=True)
 if str(ret)[2:21] != 'Already up to date.':
     print('A script is updated, please start again!')
     exit(1)
-travian();
+travian()
