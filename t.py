@@ -16,10 +16,16 @@ WAREHOUSECOEFF = 0.8
 troopSpeed = [6, 6, 6, 6, 6, 6, 6, 6, 6, 6]
 def parseVillageCoordinates(html):
     data = {}
-    temp = getRegexValue(html, 'newdid=(\\d+)[^\\d].{,20}class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
+    temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*	class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
     data['x'] = int(temp[2])
     data['y'] = int(temp[4])
     return data
+
+def getActiveVillageId(html):
+    temp = getRegexValues(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
+    if len(temp) > 0:
+        return temp[0][0]
+    return None
 
 def readDictionaryFromJson(filename):
     if not path.exists(filename):
@@ -525,7 +531,6 @@ class travian(object):
             report = self.config['reports'][reportKey]
 
             if report['timestamp'] > time.time() - 20 * 3600: # 20 hours
-                print(report)
                 for farm in farms:
                     if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
                         if 'stolen' not in farm:
@@ -593,8 +598,7 @@ class travian(object):
             attackData['x'] = farm['x']
             attackData['y'] = farm['y']
             attackData['type'] = 'raid'
-            print('attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')')
-            print(farm['period'])
+            print('Farming from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + farm['period'] + ' seconds' )
             if not self.doOnceInSeconds(farm['period'], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
                 if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                     break
@@ -1057,9 +1061,10 @@ class travian(object):
                         #log.error('Could not relogin %d time' %reconnects)
                         print(('Could not relogin %d time' %reconnects))
                         time.sleep(randint(1,5))
-        if 'newdid=' in url or vid != "-1":
-            if vid == "-1":
-                vid = getRegexValue(url,'newdid=(\\d+)')
+
+        vid = getActiveVillageId(html.text)
+
+        if vid:
             data = {}
             if 'dorf1.php' in url:
                 data = self.analysisDorf1(html.text)
