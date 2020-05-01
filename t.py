@@ -16,7 +16,7 @@ WAREHOUSECOEFF = 0.8
 troopSpeed = [6, 6, 6, 6, 6, 6, 6, 6, 6, 6]
 def parseVillageCoordinates(html):
     data = {}
-    temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*	class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
+    temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
     data['x'] = int(temp[2])
     data['y'] = int(temp[4])
     return data
