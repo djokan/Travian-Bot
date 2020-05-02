@@ -28,7 +28,21 @@ def getActiveVillageId(html):
         return temp[0][0]
     return None
 
-def getFighthingSgrength(troops):
+def addTroop(troops, number):
+    for i in range(len(troops)):
+        if troops[i] > 0:
+            troops[i] += number
+            break
+    return troops
+
+def mulTroop(troops, by):
+    for i in range(len(troops)):
+        if troops[i] > 0:
+            troops[i] *= by
+            break
+    return troops
+
+def getFighthingStrength(troops):
     fs = 0
     for i in range(len(troops)):
         fs += troops[i] * troopStrength[i]
@@ -138,7 +152,8 @@ def getSecondMarketplaceData(html):
     data['x2']='1'
     return data
 def getBattleLinks(html):
-    temp = getRegexValues(html,'(berichte.php[^"]*t=\\d*&s=\\d*)"')
+    temp = getRegexValues(html,'(berichte.php\\?id=\\d*%7C[a-z0-9]*&amp;t=\\d*&s=\\d*)"')
+
     for i in range(len(temp)):
         temp[i] = 	temp[i].replace("&amp;","&")
     return temp
@@ -149,7 +164,7 @@ def getNextBattlePage(html):
     pages = getRegexValues(html,'(berichte.php.t=\\d*&amp;page=\\d*)"')
     return pages[len(pages) - 2].replace("&amp;","&")
 def getBattleId(url):
-    return getRegexValue(url,'id=([^%]*)%')
+    return getRegexValue(url,'id=([^&]*)&')
 def getVillageCoordinatesFromD(d):
     coords = {}
     coords['x'] = (d-1)%801 - 400
@@ -531,6 +546,7 @@ class travian(object):
 
     def calculateFarmPeriods(self, vid, farms):
 
+        print('Calculating farm periods for village: ' + vid)
         for farm in farms:
             if (not 'period' in farm) or farm['period'] == -1:
                 farm['period'] = self.travelTime(vid, farm)
@@ -581,7 +597,7 @@ class travian(object):
         troopsNeeded = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         for i in range(numberOfFarms):
             farm = farms[i]
-            troopsNeeded = numpy.add(troopsNeeded, numpy.multiply(self.config['villages'][vid]['farmTroops'], self.travelTime(vid, farm) / farm['period']))
+            troopsNeeded = numpy.add(troopsNeeded, numpy.multiply(self.calculateTroopNumber(vid, farm), self.travelTime(vid, farm) / farm['period']))
         troopsNeeded = troopsNeeded.tolist()
 
         periodAlign = 0
@@ -593,18 +609,52 @@ class travian(object):
             farm['period'] *= periodAlign
 
     def calculateTroopNumber(self, vid, farm):
-        troops = self.config['villages'][vid]['farmTroops'].copy()
         minfs = 0
+        maxfs = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
             if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
                 if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    minfs = max(minfs, getFighthingSgrength(report['source']['sent'])+1)
-        while minfs > getFighthingSgrength(troops):
-            for i in range(len(troops)):
-                if troops[i] > 0:
-                    troops[i] += 1
-                    break
+                    minfs = max(minfs, getFighthingStrength(report['source']['sent'])+1)
+                if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                    maxfs = min(maxfs, getFighthingStrength(report['source']['sent']))
+        troops = self.config['villages'][vid]['farmTroops'].copy()
+
+        if maxfs == 1000000000 and minfs == 0:
+            return troops
+
+        if maxfs == 1000000000:
+            while minfs > getFighthingStrength(troops):
+                addTroop(troops, 1)
+            addTroop(troops, -1)
+            mulTroop(troops, 2)
+            return troops
+
+        if minfs >= maxfs:
+            while minfs > getFighthingStrength(troops):
+                addTroop(troops, 1)
+            return troops
+
+        while maxfs > getFighthingStrength(troops):
+            addTroop(troops, 1)
+
+        oldTroops = troops.copy()
+        if sum(troops) > 100:
+            addTroop(troops, -20-sum(troops)%10)
+        else:
+            if sum(troops) > 50:
+                addTroop(troops, -10-sum(troops)%10)
+            else:
+                if sum(troops) > 20:
+                    addTroop(troops, -5-sum(troops)%5)
+                else:
+                    if sum(troops) > 10:
+                        addTroop(troops, -2)
+                    else:
+                        addTroop(troops, -1)
+
+        if minfs > getFighthingStrength(troops):
+            troops = oldTroops
         return troops
 
     def farm(self, vid):
