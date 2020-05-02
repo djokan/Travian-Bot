@@ -540,14 +540,12 @@ class travian(object):
                         farm['stolen'] += report['stolen']
                         farm['capacity'] += report['capacity']
                         farm['attacksNumber'] += 1
-        
+
         avgCoefficient = 0
         numOfCoefficients = 0
         for farm in farms:
             if 'stolen' in farm:
                 farm['coefficient'] = 0.0000000001 + farm['stolen'] / (self.travelTime(vid, farm) * farm['attacksNumber'])
-                if farm['stolen']/farm['capacity'] > 0.9:
-                    farm['coefficient'] *= 1.1
                 farm['period'] /= farm['coefficient']
                 avgCoefficient += farm['coefficient']
                 numOfCoefficients += 1
@@ -559,6 +557,9 @@ class travian(object):
             if 'stolen' not in farm:
                 farm['coefficient'] = avgCoefficient
                 farm['period'] /= farm['coefficient']
+        for farm in farms:
+            if farm['stolen']/farm['capacity'] > 0.9:
+                farm['period'] *= 0.8
 
         farms = sorted(farms, key = lambda i: i['period'])
 
@@ -598,7 +599,7 @@ class travian(object):
             attackData['x'] = farm['x']
             attackData['y'] = farm['y']
             attackData['type'] = 'raid'
-            print('Farming from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + farm['period'] + ' seconds' )
+            print('Farming from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period']) + ' seconds' )
             if not self.doOnceInSeconds(farm['period'], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
                 if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                     break
