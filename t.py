@@ -13,7 +13,8 @@ from random import randint
 import os.path
 from os import path
 WAREHOUSECOEFF = 0.8
-troopSpeed = [6, 6, 6, 6, 6, 6, 6, 6, 6, 6]
+troopSpeed = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
+troopStrength = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
 def parseVillageCoordinates(html):
     data = {}
     temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
@@ -26,6 +27,12 @@ def getActiveVillageId(html):
     if len(temp) > 0:
         return temp[0][0]
     return None
+
+def getFighthingSgrength(troops):
+    fs = 0
+    for i in range(len(troops)):
+        fs += troops[i] * troopStrength[i]
+    return fs
 
 def readDictionaryFromJson(filename):
     if not path.exists(filename):
@@ -536,16 +543,14 @@ class travian(object):
                         if 'stolen' not in farm:
                             farm['stolen'] = 0
                             farm['capacity'] = 0
-                            farm['attacksNumber'] = 0
                         farm['stolen'] += report['stolen']
                         farm['capacity'] += report['capacity']
-                        farm['attacksNumber'] += 1
 
         avgCoefficient = 0
         numOfCoefficients = 0
         for farm in farms:
             if 'stolen' in farm:
-                farm['coefficient'] = 0.0000000001 + farm['stolen'] / (self.travelTime(vid, farm) * farm['attacksNumber'])
+                farm['coefficient'] = 0.0000000001 + farm['stolen'] / (farm['capacity'] * self.travelTime(vid, farm))
                 farm['period'] /= farm['coefficient']
                 avgCoefficient += farm['coefficient']
                 numOfCoefficients += 1
@@ -587,6 +592,21 @@ class travian(object):
         for farm in farms:
             farm['period'] *= periodAlign
 
+    def calculateTroopNumber(self, vid, farm):
+        troops = self.config['villages'][vid]['farmTroops'].copy()
+        minfs = 0
+        for reportKey in self.config['reports']:
+            report = self.config['reports'][reportKey]
+            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+                if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                    minfs = max(minfs, getFighthingSgrength(report['source']['sent'])+1)
+        while minfs > getFighthingSgrength(troops):
+            for i in range(len(troops)):
+                if troops[i] > 0:
+                    troops[i] += 1
+                    break
+        return troops
+
     def farm(self, vid):
         self.readFarmsFile(vid)
         self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid, self.config['villages'][vid]['farms'])
@@ -595,14 +615,16 @@ class travian(object):
                 continue
             attackData = {}
             attackData['vid'] = vid
-            attackData['troops'] = self.config['villages'][vid]['farmTroops']
+            attackData['troops'] = self.calculateTroopNumber(vid, farm)
+            
             attackData['x'] = farm['x']
             attackData['y'] = farm['y']
             attackData['type'] = 'raid'
-            print('Farming from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period']) + ' seconds' )
             if not self.doOnceInSeconds(farm['period'], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
                 if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                     break
+            else:
+                print('Farmed from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period']) + ' seconds, troops ' + str(attackData['troops']))
         self.saveFarmsFile(vid)
 
     def resourceFieldLevelsSum(self, vid):
