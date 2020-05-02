@@ -13,14 +13,45 @@ from random import randint
 import os.path
 from os import path
 WAREHOUSECOEFF = 0.8
-troopSpeed = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
-troopStrength = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
+troopSpeed = {}
+troopSpeed["Roman"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
+troopSpeed["Gaul"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
+troopSpeed["Teuton"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
+
+troopStrength = {}
+troopStrength["Roman"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
+troopStrength["Gaul"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
+troopStrength["Teuton"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
+
+
+initialTroopsForFarming = []
+initialTroopsForFarming.append([10, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 10, 0, 0, 0, 0, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 10, 0, 0, 0, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 5, 0, 0, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 5, 0, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 5, 0, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 5, 0, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 5, 0, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 5, 0])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
+
+
 def parseVillageCoordinates(html):
     data = {}
     temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
     data['x'] = int(temp[2])
     data['y'] = int(temp[4])
     return data
+
+def troopTypeOfReport(report):
+    maxTroops = 0
+    maxType = 0
+    for i in range(len(report['source']['sent'])):
+        if report['source']['sent'][i] > maxTroops:
+            maxTroops = report['source']['sent'][i]
+            maxType = i
+    return maxType
 
 def getActiveVillageId(html):
     temp = getRegexValues(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
@@ -41,12 +72,6 @@ def mulTroop(troops, by):
             troops[i] *= by
             break
     return troops
-
-def getFighthingStrength(troops):
-    fs = 0
-    for i in range(len(troops)):
-        fs += troops[i] * troopStrength[i]
-    return fs
 
 def readDictionaryFromJson(filename):
     if not path.exists(filename):
@@ -331,6 +356,12 @@ class travian(object):
                 pass
         return constructionFinishTimes
 
+    def getFighthingStrength(self, troops):
+        fs = 0
+        for i in range(len(troops)):
+            fs += troops[i] * troopStrength[self.config['tribe']][i]
+        return fs
+
     def printProductionData(self):
         woodProduction=0
         clayProduction=0
@@ -541,33 +572,39 @@ class travian(object):
             self.buildBuilding(vid)
         return True
 
-    def travelTime(self, vid, farm):
-        return math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/6
+    def travelTime(self, vid, farm, troopType):
+        return math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/troopSpeed[self.config['tribe']][troopType]
 
-    def calculateFarmPeriods(self, vid, farms):
+    def initFarmPeriods(self, vid, farm):
+        periods = []
+        for troopType in range(10):
+            periods.append(self.travelTime(vid, farm, troopType))
+        return periods
 
-        print('Calculating farm periods for village: ' + vid)
-        for farm in farms:
-            if (not 'period' in farm) or farm['period'] == -1:
-                farm['period'] = self.travelTime(vid, farm)
+    def getLastDayStatistics(self, farms, troopType):
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
+            if troopTypeOfReport(report) != troopType:
+                continue
+            if report['timestamp'] < time.time() - 20 * 3600: # don't consider older than 20 hours
+                continue
+            for farm in farms:
+                if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+                    if 'stolen' not in farm:
+                        farm['stolen'] = 0
+                        farm['capacity'] = 0
+                    farm['stolen'] += report['stolen']
+                    farm['capacity'] += report['capacity']
 
-            if report['timestamp'] > time.time() - 20 * 3600: # 20 hours
-                for farm in farms:
-                    if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
-                        if 'stolen' not in farm:
-                            farm['stolen'] = 0
-                            farm['capacity'] = 0
-                        farm['stolen'] += report['stolen']
-                        farm['capacity'] += report['capacity']
-
+    def calculateCoefficients(self, vid, farms, troopType):
+        self.getLastDayStatistics(farms, troopType)
         avgCoefficient = 0
         numOfCoefficients = 0
         for farm in farms:
             if 'stolen' in farm:
-                farm['coefficient'] = 0.0000000001 + farm['stolen'] / (farm['capacity'] * self.travelTime(vid, farm))
-                farm['period'] /= farm['coefficient']
+                fighthingStrength = self.getFighthingStrength(self.calculateTroopsToSend(vid, farm, troopType))
+                averageStealPercent = farm['stolen'] / farm['capacity']
+                farm['coefficient'] = 0.0000000001 + averageStealPercent / self.travelTime(vid, farm, troopType)
                 avgCoefficient += farm['coefficient']
                 numOfCoefficients += 1
         if numOfCoefficients > 0:
@@ -577,65 +614,81 @@ class travian(object):
         for farm in farms:
             if 'stolen' not in farm:
                 farm['coefficient'] = avgCoefficient
-                farm['period'] /= farm['coefficient']
-        for farm in farms:
-            if farm['stolen']/farm['capacity'] > 0.9:
-                farm['period'] *= 0.8
 
-        farms = sorted(farms, key = lambda i: i['period'])
+    def calculateFarmPeriods(self, vid, farms):
+        print('Calculating farm periods for village: ' + vid)
+        troopTypes = []
+        for i in range(len(self.config['villages'][vid]['troopCapacity'])):
+            if self.config['villages'][vid]['troopCapacity'][i] > 0:
+                troopTypes.append(i)
+        for troopType in troopTypes:
+            print('Calculating farm periods for troop type: ' + str(troopType))
+            for farm in farms:
+                if not 'period' in farm:
+                    farm['period'] = self.initFarmPeriods(vid, farm)
 
-        numberOfFarms = len(farms)
-        while farms[numberOfFarms - 1]['period'] > 12*3600:
-            numberOfFarms -= 1
-            self.alignPeriod(vid, farms, numberOfFarms)
-        for farm in farms:
-            farm['period'] = int(farm['period'])
-            del farm['coefficient']
+            self.calculateCoefficients(vid, farms, troopType)
+
+            for farm in farms:
+                farm['period'][troopType] /= farm['coefficient']
+
+            for farm in farms:
+                if 'stolen' in farm and farm['stolen']/farm['capacity'] > 0.9:
+                    farm['period'][troopType] *= 0.8
+
+            farms = sorted(farms, key = lambda i: i['period'][troopType])
+
+            numberOfFarms = len(farms)
+            while farms[numberOfFarms - 1]['period'][troopType] > 12*3600:
+                numberOfFarms -= 1
+                self.alignPeriod(vid, farms, troopType, numberOfFarms)
+            for farm in farms:
+                farm['period'][troopType] = int(farm['period'][troopType])
+                tempfarm = farm.copy()	
+                for key in tempfarm:
+                    if key != 'x' and key != 'y' and key != 'period':
+                        del farm[key]
         return True
 
-    def alignPeriod(self, vid, farms, numberOfFarms):
-        troopsNeeded = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    def alignPeriod(self, vid, farms, troopType, numberOfFarms):
+        troopsNeeded = 0
         for i in range(numberOfFarms):
             farm = farms[i]
-            troopsNeeded = numpy.add(troopsNeeded, numpy.multiply(self.calculateTroopNumber(vid, farm), self.travelTime(vid, farm) / farm['period']))
-        troopsNeeded = troopsNeeded.tolist()
+            troopsNeeded += 1.0 * self.calculateTroopsToSend(vid, farm, troopType)[troopType] * self.travelTime(vid, farm, troopType) / farm['period'][troopType]
 
-        periodAlign = 0
-        for i in range(len(troopsNeeded)):
-            if self.config['villages'][vid]['troopCapacity'][i] > 0:
-                periodAlign = max(periodAlign, troopsNeeded[i]/self.config['villages'][vid]['troopCapacity'][i])
+        periodAlign = troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType]
 
         for farm in farms:
-            farm['period'] *= periodAlign
+            farm['period'][troopType] *= periodAlign
 
-    def calculateTroopNumber(self, vid, farm):
+    def calculateTroopsToSend(self, vid, farm, troopType):
         minfs = 0
         maxfs = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
-            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y'] and troopTypeOfReport(report) == troopType:
                 if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    minfs = max(minfs, getFighthingStrength(report['source']['sent'])+1)
+                    minfs = max(minfs, self.getFighthingStrength(report['source']['sent'])+1)
                 if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    maxfs = min(maxfs, getFighthingStrength(report['source']['sent']))
-        troops = self.config['villages'][vid]['farmTroops'].copy()
+                    maxfs = min(maxfs, self.getFighthingStrength(report['source']['sent']))
+        troops = initialTroopsForFarming[troopType].copy()
 
         if maxfs == 1000000000 and minfs == 0:
             return troops
 
         if maxfs == 1000000000:
-            while minfs > getFighthingStrength(troops):
+            while minfs > self.getFighthingStrength(troops):
                 addTroop(troops, 1)
             addTroop(troops, -1)
             mulTroop(troops, 2)
             return troops
 
         if minfs >= maxfs:
-            while minfs > getFighthingStrength(troops):
+            while minfs > self.getFighthingStrength(troops):
                 addTroop(troops, 1)
             return troops
 
-        while maxfs > getFighthingStrength(troops):
+        while maxfs > self.getFighthingStrength(troops):
             addTroop(troops, 1)
 
         oldTroops = troops.copy()
@@ -653,28 +706,33 @@ class travian(object):
                     else:
                         addTroop(troops, -1)
 
-        if minfs > getFighthingStrength(troops):
+        if minfs > self.getFighthingStrength(troops):
             troops = oldTroops
         return troops
 
     def farm(self, vid):
         self.readFarmsFile(vid)
         self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid, self.config['villages'][vid]['farms'])
-        for farm in self.config['villages'][vid]['farms']:
-            if farm['period'] > 12 * 3600:
-                continue
-            attackData = {}
-            attackData['vid'] = vid
-            attackData['troops'] = self.calculateTroopNumber(vid, farm)
-            
-            attackData['x'] = farm['x']
-            attackData['y'] = farm['y']
-            attackData['type'] = 'raid'
-            if not self.doOnceInSeconds(farm['period'], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
-                if not self.doesHaveEnoughTroops(vid, attackData['troops']):
-                    break
-            else:
-                print('Farmed from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period']) + ' seconds, troops ' + str(attackData['troops']))
+        troopTypes = []
+        for i in range(len(self.config['villages'][vid]['troopCapacity'])):
+            if self.config['villages'][vid]['troopCapacity'][i] > 0:
+                troopTypes.append(i)
+        for troopType in troopTypes:
+            for farm in self.config['villages'][vid]['farms']:
+                if farm['period'][troopType] > 12 * 3600:
+                    continue
+                attackData = {}
+                attackData['vid'] = vid
+                attackData['troops'] = self.calculateTroopsToSend(vid, farm, troopType)
+
+                attackData['x'] = farm['x']
+                attackData['y'] = farm['y']
+                attackData['type'] = 'raid'
+                if not self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
+                    if not self.doesHaveEnoughTroops(vid, attackData['troops']):
+                        break
+                else:
+                    print('Farmed from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops']))
         self.saveFarmsFile(vid)
 
     def resourceFieldLevelsSum(self, vid):
