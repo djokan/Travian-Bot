@@ -37,14 +37,6 @@ initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 5, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 5, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
 
-def equalOrMoreFightingStrength(fs, troopType):
-    troops = []
-    for i in range(10):
-        troops.append(1 if troopType == i else 0)
-    while (fs > getFighthingStrength(troops)):
-        addTroop(troops, 1)
-    return troops
-
 def parseVillageCoordinates(html):
     data = {}
     temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
@@ -283,12 +275,12 @@ class travian(object):
                 break
         self.saveReportsFile()
 
-    def readBattleReport(self, battle):
+    def readBattleReport(self, battleUrl):
 
-        html = self.sendRequest(self.config['server'] + battle, {}, False)
+        html = self.sendRequest(self.config['server'] + battleUrl, {}, False)
         report = {}
 
-        report['type'] = int(getRegexValue(battle, 't=(\\d+)[^\\d]'))
+        report['type'] = int(getRegexValue(battleUrl, 't=(\\d+)[^\\d]'))
 
         date = getRegexValue(html, '<div class="time">[^>]*>([^<]*)<')
 
@@ -334,7 +326,7 @@ class travian(object):
         capacity = getRegexValue(html,'title="carry" />&#x202d;&#x202d;\\d*&#x202c;/&#x202d;(\\d*)&')
         report['capacity'] = int(capacity)
 
-        self.config['reports'][getBattleId(battle)] = report
+        self.config['reports'][getBattleId(battleUrl)] = report
 
     def getNextSleepDelay(self):
         now = datetime.datetime.now()
@@ -698,14 +690,14 @@ class travian(object):
         minimalFighthingStrength = max(minimalFighthingStrength, 350)
 
         if maximalFighthingStrength == 1000000000:
-            troops = equalOrMoreFightingStrength(minimalFighthingStrength, troopType)
+            troops = self.getEqualOrMoreFightingStrengthTroops(minimalFighthingStrength, troopType)
             mulTroop(troops, 2)
             return troops
 
         if minimalFighthingStrength >= maximalFighthingStrength:
-            return equalOrMoreFightingStrength(minimalFighthingStrength, troopType)
+            return self.getEqualOrMoreFightingStrengthTroops(minimalFighthingStrength, troopType)
 
-        troops = equalOrMoreFightingStrength(maximalFighthingStrength, troopType)
+        troops = self.getEqualOrMoreFightingStrengthTroops(maximalFighthingStrength, troopType)
 
         oldTroops = troops.copy()
         if sum(troops) > 100:
@@ -724,6 +716,14 @@ class travian(object):
 
         if minimalFighthingStrength > self.getFighthingStrength(troops):
             troops = oldTroops
+        return troops
+
+    def getEqualOrMoreFightingStrengthTroops(self, fs, troopType):
+        troops = []
+        for i in range(10):
+            troops.append(1 if troopType == i else 0)
+        while (fs > self.getFighthingStrength(troops)):
+            addTroop(troops, 1)
         return troops
 
     def farm(self, vid):
@@ -842,7 +842,6 @@ class travian(object):
             fieldId=self.buildFindMinField(vid)
             if fieldId:
                 self.buildField(vid, fieldId)
-
 
     def buildField(self, vid, filedId):
         print('Start Building on Village ' + vid + ' field ' + str(filedId))
