@@ -7,6 +7,7 @@ import datetime
 import traceback
 import subprocess
 import random
+import shutil
 import numpy
 import math
 from random import randint
@@ -43,6 +44,9 @@ def parseVillageCoordinates(html):
     data['x'] = int(temp[2])
     data['y'] = int(temp[4])
     return data
+
+def removeFarm(farmToRemove, farms):
+    farms = [farm for farm in farms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
 
 def troopTypeOfReport(report):
     maxTroops = 0
@@ -236,9 +240,10 @@ class travian(object):
             if function(*args) == True:
                 self.doneTasks[function_name] = time.time() + delay
                 saveDictionaryToJson(self.doneTasks, 'doOnceInSeconds.json')
+                return True
             else:
                 return False
-        return True
+        return None
 
     def readOffensiveReports(self):
         nextBattlePage = 'berichte.php?t=1'
@@ -602,7 +607,6 @@ class travian(object):
         numOfCoefficients = 0
         for farm in farms:
             if 'stolen' in farm:
-                fighthingStrength = self.getFighthingStrength(self.calculateTroopsToSend(vid, farm, troopType))
                 averageStealPercent = farm['stolen'] / farm['capacity']
                 farm['coefficient'] = 0.0000000001 + averageStealPercent / self.travelTime(vid, farm, troopType)
                 avgCoefficient += farm['coefficient']
@@ -661,34 +665,39 @@ class travian(object):
         for farm in farms:
             farm['period'][troopType] *= periodAlign
 
+
     def calculateTroopsToSend(self, vid, farm, troopType):
-        minfs = 0
-        maxfs = 1000000000
+        minimalFighthingStrength = 0
+        maximalFighthingStrength = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
-            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y'] and troopTypeOfReport(report) == troopType:
-                if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    minfs = max(minfs, self.getFighthingStrength(report['source']['sent'])+1)
-                if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    maxfs = min(maxfs, self.getFighthingStrength(report['source']['sent']))
+            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+                if troopTypeOfReport(report) == troopType:    
+                    if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                        minimalFighthingStrength = max(minimalFighthingStrength, self.getFighthingStrength(report['source']['sent'])+1)
+                    if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                        maximalFighthingStrength = min(maximalFighthingStrength, self.getFighthingStrength(report['source']['sent']))
+                if report['destination']['sent'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                    return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         troops = initialTroopsForFarming[troopType].copy()
 
-        if maxfs == 1000000000 and minfs == 0:
+        if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 0:
             return troops
 
-        if maxfs == 1000000000:
-            while minfs > self.getFighthingStrength(troops):
+        minimalFighthingStrength = 350
+        if maximalFighthingStrength == 1000000000:
+            while minimalFighthingStrength > self.getFighthingStrength(troops):
                 addTroop(troops, 1)
             addTroop(troops, -1)
             mulTroop(troops, 2)
             return troops
 
-        if minfs >= maxfs:
-            while minfs > self.getFighthingStrength(troops):
+        if minimalFighthingStrength >= maximalFighthingStrength:
+            while minimalFighthingStrength > self.getFighthingStrength(troops):
                 addTroop(troops, 1)
             return troops
 
-        while maxfs > self.getFighthingStrength(troops):
+        while maximalFighthingStrength > self.getFighthingStrength(troops):
             addTroop(troops, 1)
 
         oldTroops = troops.copy()
@@ -706,7 +715,7 @@ class travian(object):
                     else:
                         addTroop(troops, -1)
 
-        if minfs > self.getFighthingStrength(troops):
+        if minimalFighthingStrength > self.getFighthingStrength(troops):
             troops = oldTroops
         return troops
 
@@ -717,6 +726,7 @@ class travian(object):
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
                 troopTypes.append(i)
+        print('Sending troop types ' + str(troopTypes) + ' from village' + vid + ' for farming.')
         for troopType in troopTypes:
             for farm in self.config['villages'][vid]['farms']:
                 if farm['period'][troopType] > 12 * 3600:
@@ -724,15 +734,20 @@ class travian(object):
                 attackData = {}
                 attackData['vid'] = vid
                 attackData['troops'] = self.calculateTroopsToSend(vid, farm, troopType)
-
+                if attackData['troops'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                    removeFarm(farm, self.config['villages'][vid]['farms'])
+                    continue
                 attackData['x'] = farm['x']
                 attackData['y'] = farm['y']
                 attackData['type'] = 'raid'
-                if not self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData):
+                attackInfo = 'from' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
+                isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
+                if not isSuccessful:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
+                        print('Does not have enough troops to send ' + attackInfo)
                         break
-                else:
-                    print('Farmed from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops']))
+                if isSuccessful:
+                    print('Farmed ' + attackInfo)
         self.saveFarmsFile(vid)
 
     def resourceFieldLevelsSum(self, vid):
@@ -934,6 +949,8 @@ class travian(object):
         return False
 
     def doesHaveEnoughTroops(self, vid, troopsToSend):
+        if 'availableTroops' not in self.config['villages'][vid]:
+            html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True, vid)
         for i in range(len(troopsToSend)):
             if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
                 return False
@@ -979,7 +996,7 @@ class travian(object):
         html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         if 'There is no village at these coordinates.' in html and 'farms' in self.config['villages'][attackData['vid']]:
-            self.config['villages'][attackData['vid']]['farms'] = [farm for farm in self.config['villages'][attackData['vid']]['farms'] if attackData['x'] != farm['x'] or attackData['y'] != farm['y']]
+            removeFarm({'x': attackData['x'], 'y': attackData['y']}, self.config['villages'][attackData['vid']]['farms'])
             return False
 
         data = {}
@@ -998,8 +1015,10 @@ class travian(object):
 
     def analysisSendTroops(self, html):
         data = {}
-        troops = getRegexValues(html, 'troops\\[0\\]\\[t\\d+\\]"[^<]*<[^>]*>&#x202d;([^&]*)&')
-        troops = [int(troop) for troop in troops]
+        troopsData = getRegexValues(html, 'troops\\[0\\]\\[t(\\d+)\\]"[^<]*<[^>]*>&#x202d;([^&]*)&')
+        troops = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        for temp in troopsData:
+            troops[int(temp[0]) - 1] = int(temp[1])
         data['availableTroops'] = troops
         return data
 
@@ -1078,7 +1097,10 @@ class travian(object):
         return data
 
     def readFarmsFile(self, vid):
-        self.config['villages'][vid]['farms'] = readDictionaryFromJson('farms_' + vid + '.json')['farms']
+        filename = 'farms_' + vid + '.json'
+        if not path.exists(filename):
+            shutil.copyfile('farms.json', filename)
+        self.config['villages'][vid]['farms'] = readDictionaryFromJson(filename)['farms']
 
     def saveFarmsFile(self, vid):
         saveDictionaryToJson({'farms': self.config['villages'][vid]['farms']}, 'farms_' + vid + '.json')
