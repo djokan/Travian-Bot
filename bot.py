@@ -427,24 +427,24 @@ class travian(object):
             r2 = int(int(r2)*coeff)
             r3 = int(int(r3)*coeff)
             r4 = int(int(r4)*coeff)
-            r1 = r1-r1%50
-            r2 = r2-r2%50
-            r3 = r3-r3%50
-            r4 = r4-r4%50
+            r1 = r1-r1%100
+            r2 = r2-r2%100
+            r3 = r3-r3%100
+            r4 = r4-r4%100
             r1 = str(r1)
             r2 = str(r2)
             r3 = str(r3)
             r4 = str(r4)
         tempp = 0
-        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.85 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
-            if tempp%4==0 and int(r1)>50:
-                r1 = str(int(r1)-50)
-            if tempp%4==1 and int(r2)>50:
-                r2 = str(int(r2)-50)
-            if tempp%4==2 and int(r3)>50:
-                r3 = str(int(r3)-50)
-            if tempp%4==3 and int(r4)>50:
-                r4 = str(int(r4)-50)
+        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.79 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
+            if tempp%4==0 and int(r1)>100:
+                r1 = str(int(r1)-100)
+            if tempp%4==1 and int(r2)>100:
+                r2 = str(int(r2)-100)
+            if tempp%4==2 and int(r3)>100:
+                r3 = str(int(r3)-100)
+            if tempp%4==3 and int(r4)>100:
+                r4 = str(int(r4)-100)
             tempp = tempp+1
         print('Trying to send ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
         if int(r1)+int(r2)+int(r3)+int(r4)<self.getMinMarketTreshold():
@@ -504,7 +504,7 @@ class travian(object):
             self.doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             self.doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
-        self.sendHTTPRequestedResources(vid)
+        self.sendRequestedResources(vid)
 
     def checkVillage(self, vid):
         html=self.sendHTTPRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
@@ -534,7 +534,7 @@ class travian(object):
             sendingSum = 0
             for i in range(4):
                 if (availableResources[i]<pushResourcesAndPeriod[i]):
-                    pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%50
+                    pushResourcesAndPeriod[i] = availableResources[i]-availableResources[i]%100
                 sendingSum = sendingSum + pushResourcesAndPeriod[i]
             if (sendingSum >= self.getMinMarketTreshold()):
                 self.doOnceInSeconds(pushResourcesAndPeriod[4], self.sendResources, 'push ' + vid, vid, pushCoordinates[0], pushCoordinates[1], str(pushResourcesAndPeriod[0]), str(pushResourcesAndPeriod[1]), str(pushResourcesAndPeriod[2]), str(pushResourcesAndPeriod[3]), True)
@@ -754,7 +754,7 @@ class travian(object):
                 attackData['y'] = farm['y']
                 attackData['type'] = 'raid'
                 attackInfo = 'from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
-                isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
+                isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + '][' + str(troopType) + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
                 if isSuccessful == False:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                         print('Does not have enough troops to send ' + attackInfo)
@@ -803,7 +803,7 @@ class travian(object):
             return 30
         return int(getRegexValue(html,'build\\.php\\?id='+str(buildingId)+'[^L]*Level (\\d+)[^\\d]'))
         
-    def sendHTTPRequestedResources(self, vid):
+    def sendRequestedResources(self, vid):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             availableResources=None
@@ -823,7 +823,7 @@ class travian(object):
             sendingSum = 0
             for i in range(4):
                 if (availableResources[i]<self.RequestedResources[vid][i+1]):
-                    self.RequestedResources[vid][i+1] = availableResources[i]-availableResources[i]%50
+                    self.RequestedResources[vid][i+1] = availableResources[i]-availableResources[i]%100
                 sendingSum = sendingSum + self.RequestedResources[vid][i+1]
             print('Trying to send' + str(self.RequestedResources[vid]))
             if (sendingSum<self.getMinMarketTreshold()):
@@ -960,8 +960,8 @@ class travian(object):
             return desiredFieldIndex+1
         return False
 
-    def doesHaveEnoughTroops(self, vid, troopsToSend):
-        if 'availableTroops' not in self.config['villages'][vid]:
+    def doesHaveEnoughTroops(self, vid, troopsToSend, refreshPage=True):
+        if 'availableTroops' not in self.config['villages'][vid] or refreshPage:
             html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True, vid)
         for i in range(len(troopsToSend)):
             if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
@@ -973,7 +973,7 @@ class travian(object):
 
         html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False, attackData['vid'])
 
-        if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops']):
+        if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops'], False): #refreshPage = False
             return False
 
         data = getAttackData(html)
