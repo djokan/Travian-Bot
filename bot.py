@@ -264,7 +264,7 @@ class travian(object):
             self.readReportsFile()
         while True:
             time.sleep(0.1*randint(10,30))
-            html = self.sendRequest(self.config['server'] + nextBattlePage, {}, False)
+            html = self.sendHTTPRequest(self.config['server'] + nextBattlePage, {}, False)
 
             battles = getBattleLinks(html)
 
@@ -285,7 +285,7 @@ class travian(object):
 
     def readBattleReport(self, battleUrl):
 
-        html = self.sendRequest(self.config['server'] + battleUrl, {}, False)
+        html = self.sendHTTPRequest(self.config['server'] + battleUrl, {}, False)
         report = {}
 
         report['type'] = int(getRegexValue(battleUrl, 't=(\\d+)[^\\d]'))
@@ -391,7 +391,7 @@ class travian(object):
             try:
                 villageProduction = self.config['villages'][vid]['production']
             except Exception as e:
-                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
+                self.sendHTTPRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 villageProduction = self.config['villages'][vid]['production']
             print('Village: ' + vid + ' resource fields level sum - ' + str(self.resourceFieldLevelsSum(vid)))
             woodProduction+=villageProduction[0]
@@ -461,7 +461,7 @@ class travian(object):
         data['dname'] = ''
         token = data['ajaxToken']
         olddata= data
-        html = self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
+        html = self.sendHTTPRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         oldhtml = html
         if 'allowed' in oldhtml:
             print('Exceeded sending resource amount to this player!')
@@ -472,7 +472,7 @@ class travian(object):
         data['r3'] = r3
         data['r4'] = r4
         data['ajaxToken'] = token
-        html=self.sendRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
+        html=self.sendHTTPRequest(self.config['server']+'ajax.php?cmd=prepareMarketplace',data)
         if not 'Resources have been dispatched' in html:
             print('MarketDebugInfo:')
             print(oldhtml)
@@ -483,19 +483,19 @@ class travian(object):
         return True
 
     def goToBuildingByName(self, vid, name, linkdata):
-        html=self.sendRequest(self.config['server']+'dorf2.php?newdid=' + vid)
+        html=self.sendHTTPRequest(self.config['server']+'dorf2.php?newdid=' + vid)
         idb = getRegexValue(html,'build.php\\?id=(\\d+)\'" title="'+name)
-        return self.sendRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
+        return self.sendHTTPRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
 
     def autoAdventure(self):
         print('Starting adventure')
-        html=self.sendRequest(self.config['server']+'hero.php?t=3')
+        html=self.sendHTTPRequest(self.config['server']+'hero.php?t=3')
         data=getAdventureData(html)
         for key in data:
             if data[key]==None:
                 return False
         print(data)
-        html=self.sendRequest(self.config['server']+'start_adventure.php',data)
+        html=self.sendHTTPRequest(self.config['server']+'start_adventure.php',data)
         return True
 
     def checkVillages(self):
@@ -504,10 +504,10 @@ class travian(object):
             self.doOnceInSeconds(checkPeriod, self.checkVillage, 'checkvill' + vid, vid)
         if self.adventureExists and 'autoAdventure' in self.config and self.config['autoAdventure'] == 'true':
             self.doOnceInSeconds(randint(3000,4200)*6,self.autoAdventure,'adventure')
-        self.sendRequestedResources(vid)
+        self.sendHTTPRequestedResources(vid)
 
     def checkVillage(self, vid):
-        html=self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
+        html=self.sendHTTPRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
         data=self.config['villages'][vid]
         if 'autoFarming' in self.config['villages'][vid] and self.config['villages'][vid]['autoFarming'] == 'true':
             self.farm(vid)
@@ -521,7 +521,7 @@ class travian(object):
             try:
                 availableResources=self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
+                self.sendHTTPRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources=self.config['villages'][vid]['availableResources']
             if ('holdResources' in self.config['villages'][vid]) and len(self.config['villages'][vid]['holdResources']) == 4:
                 for i in range(4):
@@ -768,7 +768,7 @@ class travian(object):
     def resourceFieldLevelsSum(self, vid):
 
         if 'fieldsList' not in self.config['villages'][vid]:
-            self.sendRequest(self.config['server'] + 'dorf1.php?newdid=' + vid)
+            self.sendHTTPRequest(self.config['server'] + 'dorf1.php?newdid=' + vid)
 
         data=self.config['villages'][vid]
         fieldsList=data['fieldsList']
@@ -782,7 +782,7 @@ class travian(object):
         build=False
         for i in range( len(self.config['villages'][vid]['building']  )):
             buildingId = self.config['villages'][vid]['building'][i]
-            self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
+            self.sendHTTPRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
             targetLevel = self.config['villages'][vid]['buildinglvl'][i]
             if (buildingId==0 and self.resourceFieldLevelsSum(vid) < targetLevel) or (buildingId>0 and self.getBuildingLvl(vid, buildingId) < targetLevel):
                 build=True
@@ -805,14 +805,14 @@ class travian(object):
             return 30
         return int(getRegexValue(html,'build\\.php\\?id='+str(buildingId)+'[^L]*Level (\\d+)[^\\d]'))
         
-    def sendRequestedResources(self, vid):
+    def sendHTTPRequestedResources(self, vid):
         for vid in self.RequestedResources:
             print('Trying to send' + str(self.RequestedResources[vid]))
             availableResources=None
             try:
                 availableResources = self.config['villages'][vid]['availableResources']
             except Exception as e:
-                self.sendRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
+                self.sendHTTPRequest(self.config['server'] + 'dorf2.php?newdid=' + vid)
                 availableResources = self.config['villages'][vid]['availableResources']
             if ('holdResources' in self.config['villages'][vid]) and len(self.config['villages'][vid]['holdResources']) == 4:
                 for i in range(4):
@@ -857,7 +857,7 @@ class travian(object):
             dorf = 1
         else:
             dorf = 2
-        html = self.sendRequest(self.config['server'] + 'build.php?newdid=' + vid + '&id=' + str(filedId))
+        html = self.sendHTTPRequest(self.config['server'] + 'build.php?newdid=' + vid + '&id=' + str(filedId))
         try:
             try:
                 m=re.search('waiting loop', html)
@@ -874,7 +874,7 @@ class travian(object):
             return False
         c = m.group(0)
 
-        self.sendRequest(self.config['server'] + 'dorf' + str(dorf) + '.php?a=' + str(filedId) + '&c=' + c + '&newdid=' + vid)
+        self.sendHTTPRequest(self.config['server'] + 'dorf' + str(dorf) + '.php?a=' + str(filedId) + '&c=' + c + '&newdid=' + vid)
 
     def buildFindMinField(self, vid):
         data=self.config['villages'][vid]
@@ -964,7 +964,7 @@ class travian(object):
 
     def doesHaveEnoughTroops(self, vid, troopsToSend):
         if 'availableTroops' not in self.config['villages'][vid]:
-            html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True, vid)
+            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True, vid)
         for i in range(len(troopsToSend)):
             if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
                 return False
@@ -973,7 +973,7 @@ class travian(object):
     # attackData = {'vid' : xxx, 'troops' : [xx, xx, xx, ...], 'sendHero'(optional) : True/False, 'villageName'(optional): '', 'x'(optional): xx, 'y'(optional): xx, 'type' : 'raid'/'normal'}
     def attack(self, attackData):
 
-        html = self.sendRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False, attackData['vid'])
+        html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False, attackData['vid'])
 
         if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops']):
             return False
@@ -1007,7 +1007,7 @@ class travian(object):
         else:
             data['c'] = '3' # normal
         data['s1'] = 'ok'
-        html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
+        html = self.sendHTTPRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         if 'There is no village at these coordinates.' in html and 'farms' in self.config['villages'][attackData['vid']]:
             self.removeFarm({'x': attackData['x'], 'y': attackData['y']}, attackData['vid'])
@@ -1023,7 +1023,7 @@ class travian(object):
                 print('attacking failed')
                 return False
         print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
-        self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
+        self.sendHTTPRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         return True
 
@@ -1185,7 +1185,7 @@ class travian(object):
 
     def login(self):
         print('Start Login')
-        html = self.sendRequest(self.config['server'])
+        html = self.sendHTTPRequest(self.config['server'])
         if html==False:
             return False
         parser = BeautifulSoup(html, "html5lib")
@@ -1199,7 +1199,7 @@ class travian(object):
                             'w': '1440:900',
                             'login': login
                         }
-        html=self.sendRequest( self.config['server'] + 'login.php', data)
+        html=self.sendHTTPRequest( self.config['server'] + 'login.php', data)
         if html==False:
             return False
         self.loggedIn=True
@@ -1217,7 +1217,7 @@ class travian(object):
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
 
-    def sendRequest(self, url, data={}, delay=True, vid="-1"):
+    def sendHTTPRequest(self, url, data={}, delay=True, vid="-1"):
         if delay:
             time.sleep(randint(1,5))
         html = None
@@ -1246,7 +1246,7 @@ class travian(object):
                 while reconnects <= 2 and tryAgain:
                     try:
                         self.login()
-                        html = self.sendRequest(url, data)
+                        html = self.sendHTTPRequest(url, data)
                         tryAgain = False
                     except self.UnableToLogIn:
                         reconnects += 1
