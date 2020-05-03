@@ -679,7 +679,7 @@ class travian(object):
             farm['period'][troopType] *= periodAlign
 
     def calculateTroopsToSend(self, vid, farm, troopType):
-        minimalFighthingStrength = 0
+        minimalFighthingStrength = 1
         maximalFighthingStrength = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
@@ -692,10 +692,8 @@ class travian(object):
                 if report['destination']['sent'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
                     return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
-        if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 0:
+        if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 1:
             return initialTroopsForFarming[troopType].copy()
-
-        minimalFighthingStrength = max(minimalFighthingStrength, 350)
 
         if maximalFighthingStrength == 1000000000:
             troops = self.getEqualOrMoreFightingStrengthTroops(minimalFighthingStrength, troopType)
@@ -755,9 +753,9 @@ class travian(object):
                 attackData['x'] = farm['x']
                 attackData['y'] = farm['y']
                 attackData['type'] = 'raid'
-                attackInfo = 'from' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
+                attackInfo = 'from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
                 isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
-                if not isSuccessful:
+                if isSuccessful == False:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                         print('Does not have enough troops to send ' + attackInfo)
                         break
