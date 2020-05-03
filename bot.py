@@ -37,6 +37,13 @@ initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 5, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 5, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
 
+def equalOrMoreFightingStrength(fs, troopType):
+    troops = []
+    for i in range(10):
+        troops.append(1 if troopType == i else 0)
+    while (fs > getFighthingStrength(troops)):
+        addTroop(troops, 1)
+    return troops
 
 def parseVillageCoordinates(html):
     data = {}
@@ -78,15 +85,21 @@ def mulTroop(troops, by):
     return troops
 
 def readDictionaryFromJson(filename):
-    if not path.exists(filename):
-        f = open(filename, "w")
+    if not os.path.exists('data'):
+        os.makedirs('data')
+    filepath = 'data/' + filename
+    if not path.exists(filepath):
+        f = open(filepath, "w")
         f.write("{}")
         f.close()
-    with open(filename,'r+') as reportsFile:
-        return json.load(reportsFile)
+    with open(filepath,'r+') as file:
+        return json.load(file)
 
 def saveDictionaryToJson(dict, filename):
-    with open(filename, 'w') as file:
+    if not os.path.exists('data'):
+        os.makedirs('data')
+    filepath = 'data/' + filename
+    with open(filepath, 'w') as file:
         json.dump(dict, file)
 
 def parseConstructionFinishTimes(html):
@@ -665,7 +678,6 @@ class travian(object):
         for farm in farms:
             farm['period'][troopType] *= periodAlign
 
-
     def calculateTroopsToSend(self, vid, farm, troopType):
         minimalFighthingStrength = 0
         maximalFighthingStrength = 1000000000
@@ -679,26 +691,21 @@ class travian(object):
                         maximalFighthingStrength = min(maximalFighthingStrength, self.getFighthingStrength(report['source']['sent']))
                 if report['destination']['sent'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
                     return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        troops = initialTroopsForFarming[troopType].copy()
 
         if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 0:
-            return troops
+            return initialTroopsForFarming[troopType].copy()
 
-        minimalFighthingStrength = 350
+        minimalFighthingStrength = max(minimalFighthingStrength, 350)
+
         if maximalFighthingStrength == 1000000000:
-            while minimalFighthingStrength > self.getFighthingStrength(troops):
-                addTroop(troops, 1)
-            addTroop(troops, -1)
+            troops = equalOrMoreFightingStrength(minimalFighthingStrength, troopType)
             mulTroop(troops, 2)
             return troops
 
         if minimalFighthingStrength >= maximalFighthingStrength:
-            while minimalFighthingStrength > self.getFighthingStrength(troops):
-                addTroop(troops, 1)
-            return troops
+            return equalOrMoreFightingStrength(minimalFighthingStrength, troopType)
 
-        while maximalFighthingStrength > self.getFighthingStrength(troops):
-            addTroop(troops, 1)
+        troops = equalOrMoreFightingStrength(maximalFighthingStrength, troopType)
 
         oldTroops = troops.copy()
         if sum(troops) > 100:
@@ -726,7 +733,7 @@ class travian(object):
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
                 troopTypes.append(i)
-        print('Sending troop types ' + str(troopTypes) + ' from village' + vid + ' for farming.')
+        print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
             for farm in self.config['villages'][vid]['farms']:
                 if farm['period'][troopType] > 12 * 3600:
@@ -1098,8 +1105,9 @@ class travian(object):
 
     def readFarmsFile(self, vid):
         filename = 'farms_' + vid + '.json'
-        if not path.exists(filename):
-            shutil.copyfile('farms.json', filename)
+        filepath = 'data/' + filename
+        if not path.exists(filepath):
+            shutil.copyfile('farms.json', filepath)
         self.config['villages'][vid]['farms'] = readDictionaryFromJson(filename)['farms']
 
     def saveFarmsFile(self, vid):
@@ -1110,7 +1118,6 @@ class travian(object):
 
     def saveReportsFile(self):
         saveDictionaryToJson(self.config['reports'], 'reports.json')
-
 
     def getConfig(self, shutdownIfError):
         try:
