@@ -11,6 +11,7 @@
         # It is highly recommended to go to link: https://pgl.yoyo.org/http/browser-headers.php
         # and copy User-Agent to this field.
   },
+  "tribe": "Roman", # Roman/Gaul/Teuton
   "autoAdventure": "true", # send hero to adventure
   "villages": {
     "51212": {
@@ -20,7 +21,10 @@
       "buildinglvl": [2,2,3,3,4,4],
       "push": [13, 54],
       "pushparams": [5000, 5000, 5000, 5000, 3600],
-      "holdResources": [0,0,0,0]
+      "holdResources": [0,0,0,0],
+      "autoFarming": "true", # if true, auto farming for this village is turned on
+      "troopCapacity": [50, 0, 0, 0, 0, 0, 0, 0, 0, 0] # number of troops that will be used for auto farming
+                                                       # (shouldn't be more than actual troops in village) 
     },
     "34151": {
       "id": 34151,
@@ -42,8 +46,8 @@
       "push": [32, 45], # send resources periodically to these coordinates
       "pushparams": [500, 500, 500, 500, 3600], # wood, clay, iron, wheat and period[seconds] to be sent periodically
       "holdResources": [0,0,0,0], # have at least [wood, clay, iron, wheat] resources in village, that won't be sent
-      "requestResourcesFrom": [51212, 34151], # if warehouse is below 80%, request resource from villages by id
-      "requestResourcesFromTime": [1000, 1500] # time that takes merchant to travel from source village to this village
+      "requestResourcesFrom": ["51212", "34151"], # if warehouse is below 80%, request resource from villages by id
+      "requestResourcesFromTime": [1000, 1500] # time[seconds] that takes merchant to travel from source village to this village
     }
   }
 }
