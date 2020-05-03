@@ -44,8 +44,11 @@ def parseVillageCoordinates(html):
     data['y'] = int(temp[4])
     return data
 
-def removeFarm(farmToRemove, farms):
-    farms = [farm for farm in farms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
+def farmInFarms(farmToSearch, farms):
+    for farm in farms:
+        if farmToSearch['x'] == farm['x'] and farmToSearch['y'] == farm['y']:
+            return True
+    return False
 
 def troopTypeOfReport(report):
     maxTroops = 0
@@ -76,10 +79,9 @@ def mulTroop(troops, by):
             break
     return troops
 
-def readDictionaryFromJson(filename):
+def readDictionaryFromJson(filepath):
     if not os.path.exists('data'):
         os.makedirs('data')
-    filepath = 'data/' + filename
     if not path.exists(filepath):
         f = open(filepath, "w")
         f.write("{}")
@@ -87,10 +89,9 @@ def readDictionaryFromJson(filename):
     with open(filepath,'r+') as file:
         return json.load(file)
 
-def saveDictionaryToJson(dict, filename):
+def saveDictionaryToJson(dict, filepath):
     if not os.path.exists('data'):
         os.makedirs('data')
-    filepath = 'data/' + filename
     with open(filepath, 'w') as file:
         json.dump(dict, file)
 
@@ -213,7 +214,7 @@ class travian(object):
         self.session = requests.Session()
         self.startingTimestamp = time.time()
         self.loggedIn=False
-        self.doneTasks = readDictionaryFromJson('doOnceInSeconds.json')
+        self.doneTasks = readDictionaryFromJson('data/doOnceInSeconds.json')
         self.adventureExists = False
         self.login()
         while 1:
@@ -240,11 +241,18 @@ class travian(object):
             print('Woke up!')
             time.sleep(1)
 
+    def removeFarm(self, farmToRemove, vid):
+        self.config['villages'][vid]['farms'] = [farm for farm in self.config['villages'][vid]['farms'] if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
+        realFarms = readDictionaryFromJson('farms.json')['farms']
+        if farmInFarms(farmToRemove, realFarms):
+            realFarms = [farm for farm in realFarms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
+            saveDictionaryToJson({'farms': realFarms}, 'farms.json')
+
     def doOnceInSeconds(self, delay, function, function_name, *args):
         if not function_name in self.doneTasks or self.doneTasks[function_name] < time.time():
             if function(*args) == True:
                 self.doneTasks[function_name] = time.time() + delay
-                saveDictionaryToJson(self.doneTasks, 'doOnceInSeconds.json')
+                saveDictionaryToJson(self.doneTasks, 'data/doOnceInSeconds.json')
                 return True
             else:
                 return False
@@ -736,13 +744,13 @@ class travian(object):
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
             for farm in self.config['villages'][vid]['farms']:
-                if farm['period'][troopType] > 12 * 3600:
+                if 'period' not in farm or farm['period'][troopType] > 12 * 3600:
                     continue
                 attackData = {}
                 attackData['vid'] = vid
                 attackData['troops'] = self.calculateTroopsToSend(vid, farm, troopType)
                 if attackData['troops'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
-                    removeFarm(farm, self.config['villages'][vid]['farms'])
+                    self.removeFarm(farm, vid)
                     continue
                 attackData['x'] = farm['x']
                 attackData['y'] = farm['y']
@@ -1002,7 +1010,7 @@ class travian(object):
         html = self.sendRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         if 'There is no village at these coordinates.' in html and 'farms' in self.config['villages'][attackData['vid']]:
-            removeFarm({'x': attackData['x'], 'y': attackData['y']}, self.config['villages'][attackData['vid']]['farms'])
+            self.removeFarm({'x': attackData['x'], 'y': attackData['y']}, attackData['vid'])
             return False
 
         data = {}
@@ -1107,16 +1115,41 @@ class travian(object):
         filepath = 'data/' + filename
         if not path.exists(filepath):
             shutil.copyfile('farms.json', filepath)
-        self.config['villages'][vid]['farms'] = readDictionaryFromJson(filename)['farms']
+        self.config['villages'][vid]['farms'] = readDictionaryFromJson(filepath)['farms']
+
+        self.removeStaleFarms(vid)
+        self.addNewFarms(vid)
+
+    def removeStaleFarms(self, vid):
+        tempfarms = self.config['villages'][vid]['farms'].copy()
+        realFarms = readDictionaryFromJson('farms.json')['farms']
+        for farm in tempfarms:
+            if not farmInFarms(farm, realFarms):
+                print('Removing farm: ' + str(farm))
+                self.removeFarm(farm, vid)
+
+                if farmInFarms(farm, self.config['villages'][vid]['farms']):
+                    exit(1)
+
+    def addNewFarms(self, vid):
+        tempfarms = self.config['villages'][vid]['farms'].copy()
+        realFarms = readDictionaryFromJson('farms.json')['farms']
+        for farm in realFarms:
+            if not farmInFarms(farm, tempfarms):
+                print('Adding farm: ' + str(farm))
+                self.config['villages'][vid]['farms'].append(farm)
+
+                if not farmInFarms(farm, self.config['villages'][vid]['farms']):
+                    exit(1)
 
     def saveFarmsFile(self, vid):
-        saveDictionaryToJson({'farms': self.config['villages'][vid]['farms']}, 'farms_' + vid + '.json')
+        saveDictionaryToJson({'farms': self.config['villages'][vid]['farms']}, 'data/farms_' + vid + '.json')
 
     def readReportsFile(self):
-        self.config['reports'] = readDictionaryFromJson('reports.json')
+        self.config['reports'] = readDictionaryFromJson('data/reports.json')
 
     def saveReportsFile(self):
-        saveDictionaryToJson(self.config['reports'], 'reports.json')
+        saveDictionaryToJson(self.config['reports'], 'data/reports.json')
 
     def getConfig(self, shutdownIfError):
         try:
