@@ -3,7 +3,7 @@ Bot is initially forked from https://github.com/ruodeng/Travian-Bot.
 
 USAGE:
 
-Bot has auto queue feature for building, auto hold small celebration, auto adventure and auto send resources between villages.
+Bot has auto queue feature for building, auto hold small celebration, auto adventure, auto send resources between villages and auto farming.
 
 SETUP:
 
