@@ -7,6 +7,7 @@ import copy
 import datetime
 import traceback
 import sys
+import simpleaudio as sa
 import subprocess
 import random
 import shutil
@@ -316,6 +317,21 @@ class travian(object):
             return False
         print(self.config['villages']["1"]['farms'])
         return True
+
+    def playIncomingAttackSound(self):
+        filename = 'res/incomingAttack.wav'
+        wave_obj = sa.WaveObject.from_wave_file(filename)
+        play_obj = wave_obj.play()
+        play_obj.wait_done()
+        time.sleep(2)
+        wave_obj = sa.WaveObject.from_wave_file(filename)
+        play_obj = wave_obj.play()
+        play_obj.wait_done()
+        time.sleep(2)
+        wave_obj = sa.WaveObject.from_wave_file(filename)
+        play_obj = wave_obj.play()
+        play_obj.wait_done()
+        time.sleep(2)
 
     def removeFarm(self, farmToRemove, vid):
         self.config['villages'][vid]['farms'] = [farm for farm in self.config['villages'][vid]['farms'] if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
@@ -1350,7 +1366,8 @@ class travian(object):
                         time.sleep(randint(1,5))
 
         vid = getActiveVillageId(html.text)
-
+        if 'class="att1"' in html:
+            self.doOnceInSeconds(3600 * 8, self.playIncomingAttackSound, 'incomingAttackSound' + vid)
         if vid:
             data = {}
             if 'dorf1.php' in url:
