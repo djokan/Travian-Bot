@@ -3,8 +3,10 @@ from bs4 import BeautifulSoup
 import re
 import time
 import json
+import copy
 import datetime
 import traceback
+import sys
 import subprocess
 import random
 import shutil
@@ -24,7 +26,6 @@ troopStrength["Roman"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
 troopStrength["Gaul"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
 troopStrength["Teuton"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
 
-
 initialTroopsForFarming = []
 initialTroopsForFarming.append([10, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 initialTroopsForFarming.append([0, 10, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -35,7 +36,9 @@ initialTroopsForFarming.append([0, 0, 0, 0, 0, 5, 0, 0, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 5, 0, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 5, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 5, 0])
-initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])\
+
+reportPrototype = {"type": 1, "timestamp": 100000000000000000000000, "source": {"sent": [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 10, "y": 10, "lost": 0}, "destination": {"sent": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 20, "y": 10, "lost": 0}, "stolen": 250, "capacity": 250}
 
 def parseVillageCoordinates(html):
     data = {}
@@ -49,6 +52,15 @@ def farmInFarms(farmToSearch, farms):
         if farmToSearch['x'] == farm['x'] and farmToSearch['y'] == farm['y']:
             return True
     return False
+
+def troopTypeOfTroops(troops):
+    maxTroops = 0
+    maxType = 0
+    for i in range(len(troops)):
+        if troops[i] > maxTroops:
+            maxTroops = troops[i]
+            maxType = i
+    return maxType
 
 def troopTypeOfReport(report):
     maxTroops = 0
@@ -207,6 +219,12 @@ def getVillageCoordinatesFromD(d):
     return coords
 class travian(object):
     def __init__(self):
+        if len(sys.argv) > 1:
+            if self.test() == True:
+                print('Test passed')
+            else:
+                print('Test failed')
+            return
         self.RequestedResources = {}
         self.config={}
         self.getConfig(True) # shutdown if error
@@ -240,6 +258,64 @@ class travian(object):
                 pass
             print('Woke up!')
             time.sleep(1)
+    
+    def test(self):
+        self.config = {}
+        self.config['tribe'] = "Roman"
+        self.config['reports'] = {}
+        self.config['reports']['1'] = copy.deepcopy(reportPrototype)
+        self.config['reports']['1']['source']['sent'] = [6, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.config['reports']['1']['destination']['x'] = 10
+        self.config['reports']['1']['destination']['y'] = 16
+        self.config['reports']['1']['stolen'] = 100
+        self.config['reports']['2'] = copy.deepcopy(reportPrototype)
+        self.config['reports']['2']['source']['sent'] = [6, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        self.config['reports']['2']['destination']['x'] = 16
+        self.config['reports']['2']['destination']['y'] = 10
+        self.config['reports']['2']['stolen'] = 200
+        self.config['reports']['3'] = copy.deepcopy(reportPrototype)
+        self.config['reports']['3']['source']['sent'] = [0, 0, 0, 0, 6, 0, 0, 0, 0, 0]
+        self.config['reports']['3']['destination']['x'] = 10
+        self.config['reports']['3']['destination']['y'] = 16
+        self.config['reports']['3']['stolen'] = 200
+        self.config['reports']['4'] = copy.deepcopy(reportPrototype)
+        self.config['reports']['4']['source']['sent'] = [0, 0, 0, 0, 6, 0, 0, 0, 0, 0]
+        self.config['reports']['4']['destination']['x'] = 16
+        self.config['reports']['4']['destination']['y'] = 10
+        self.config['reports']['4']['stolen'] = 100
+        self.config['villages'] = {}
+        self.config['villages']["1"] = {}
+        self.config['villages']["1"]['x'] = 10
+        self.config['villages']["1"]['y'] = 10
+        self.config['villages']["1"]['troopCapacity'] = [5, 0, 0, 0, 5, 0, 0, 0, 0, 0]
+        self.config['villages']["1"]['farms'] = [{"x": 10, "y": 16, "period": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 16, "y": 10, "period": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 500, "y": 500, "period": [10000, 0, 0, 0, 10000, 0, 0, 0, 0, 0]}]
+        self.alignPeriod("1", 0, 2)
+        self.alignPeriod("1", 4, 2)
+        self.config['villages']["1"]['farms'][2]["period"] = [10000, 0, 0, 0, 10000, 0, 0, 0, 0, 0]
+        self.calculateFarmPeriods("1")
+        if self.calculateTroopsToSend("1", self.config['villages']["1"]['farms'][0], 0) != [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+            print('calculateTroopsToSend1 failed')
+            return False
+        if self.calculateTroopsToSend("1", self.config['villages']["1"]['farms'][1], 0) != [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+            print('calculateTroopsToSend2 failed')
+            return False
+        if self.calculateTroopsToSend("1", self.config['villages']["1"]['farms'][0], 4) != [0, 0, 0, 0, 5, 0, 0, 0, 0, 0]:
+            print('calculateTroopsToSend3 failed')
+            return False
+        if self.calculateTroopsToSend("1", self.config['villages']["1"]['farms'][1], 4) != [0, 0, 0, 0, 5, 0, 0, 0, 0, 0]:
+            print('calculateTroopsToSend4 failed')
+            return False
+        if self.travelTime("1", self.config['villages']["1"]['farms'][0], 0) != 7200:
+            print('travelTime1 failed')
+            print(self.travelTime("1", self.config['villages']["1"]['farms'][0], 0))
+            return False
+        troopsNeeded = self.calculateTroopsNeeded("1", 0, 2)
+        if troopsNeeded > 6 or troopsNeeded < 4:
+            print('calculateTroopsNeeded1 failed')
+            print(troopsNeeded)
+            return False
+        print(self.config['villages']["1"]['farms'])
+        return True
 
     def removeFarm(self, farmToRemove, vid):
         self.config['villages'][vid]['farms'] = [farm for farm in self.config['villages'][vid]['farms'] if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
@@ -616,23 +692,25 @@ class travian(object):
 
     def calculateCoefficients(self, vid, farms, troopType):
         self.getLastDayStatistics(farms, troopType)
-        avgCoefficient = 0
-        numOfCoefficients = 0
+        avgCoefficient = 0.0001 # avgCoefficient = (oldPeriod1 + oldPeriod2 + ...) / (newPeriod1 + newPeriod2 + ...)
+        oldPeriodSum = 0
+        newPeriodSum = 0
         for farm in farms:
             if 'stolen' in farm:
                 averageStealPercent = farm['stolen'] / farm['capacity']
                 farm['coefficient'] = 0.0000000001 + averageStealPercent / self.travelTime(vid, farm, troopType)
-                avgCoefficient += farm['coefficient']
-                numOfCoefficients += 1
-        if numOfCoefficients > 0:
-            avgCoefficient /= numOfCoefficients
-        else:
-            avgCoefficient = 1
+                oldPeriodSum += farm['period'][troopType]
+                newPeriodSum += farm['period'][troopType] / farm['coefficient']
+        if oldPeriodSum > 0:
+            avgCoefficient = oldPeriodSum / newPeriodSum
         for farm in farms:
             if 'stolen' not in farm:
                 farm['coefficient'] = avgCoefficient
+            if 'stolen' in farm and farm['stolen']/farm['capacity'] > 0.95:
+                farm['coefficient'] = max(farm['coefficient'], avgCoefficient*2)
 
-    def calculateFarmPeriods(self, vid, farms):
+    def calculateFarmPeriods(self, vid):
+        farms = self.config['villages'][vid]['farms']
         print('Calculating farm periods for village: ' + vid)
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
@@ -649,34 +727,35 @@ class travian(object):
             for farm in farms:
                 farm['period'][troopType] /= farm['coefficient']
 
-            for farm in farms:
-                if 'stolen' in farm and farm['stolen']/farm['capacity'] > 0.9:
-                    farm['period'][troopType] *= 0.8
-
             farms = sorted(farms, key = lambda i: i['period'][troopType])
 
             numberOfFarms = len(farms)
+            self.alignPeriod(vid, troopType, numberOfFarms)
             while farms[numberOfFarms - 1]['period'][troopType] > 12*3600:
                 numberOfFarms -= 1
-                self.alignPeriod(vid, farms, troopType, numberOfFarms)
+                self.alignPeriod(vid, troopType, numberOfFarms)
             for farm in farms:
                 farm['period'][troopType] = int(farm['period'][troopType])
-                tempfarm = farm.copy()	
+                tempfarm = copy.deepcopy(farm)
                 for key in tempfarm:
                     if key != 'x' and key != 'y' and key != 'period':
                         del farm[key]
         return True
 
-    def alignPeriod(self, vid, farms, troopType, numberOfFarms):
-        troopsNeeded = 0
+    def calculateTroopsNeeded(self, vid, troopType, numberOfFarms):
+        troopsNeeded = 0.0
         for i in range(numberOfFarms):
-            farm = farms[i]
-            troopsNeeded += 1.0 * self.calculateTroopsToSend(vid, farm, troopType)[troopType] * self.travelTime(vid, farm, troopType) / farm['period'][troopType]
+            farm = self.config['villages'][vid]['farms'][i]
+            troopsNeeded += float(self.calculateTroopsToSend(vid, farm, troopType)[troopType]) * self.travelTime(vid, farm, troopType) / farm['period'][troopType]
+        return troopsNeeded
 
-        periodAlign = troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType]
-
-        for farm in farms:
-            farm['period'][troopType] *= periodAlign
+    def alignPeriod(self, vid, troopType, numberOfFarms):
+        troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
+        while abs(troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType] - 1) > 0.01:
+            periodAlign = troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType]
+            for i in range(len(self.config['villages'][vid]['farms'])):
+                self.config['villages'][vid]['farms'][i]['period'][troopType] *= periodAlign
+            troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
 
     def calculateTroopsToSend(self, vid, farm, troopType):
         minimalFighthingStrength = 1
@@ -693,7 +772,7 @@ class travian(object):
                     return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 1:
-            return initialTroopsForFarming[troopType].copy()
+            return copy.deepcopy(initialTroopsForFarming[troopType])
 
         if maximalFighthingStrength == 1000000000:
             troops = self.getEqualOrMoreFightingStrengthTroops(minimalFighthingStrength, troopType)
@@ -705,7 +784,7 @@ class travian(object):
 
         troops = self.getEqualOrMoreFightingStrengthTroops(maximalFighthingStrength, troopType)
 
-        oldTroops = troops.copy()
+        oldTroops = copy.deepcopy(troops)
         if sum(troops) > 100:
             addTroop(troops, -20-sum(troops)%10)
         else:
@@ -734,7 +813,7 @@ class travian(object):
 
     def farm(self, vid):
         self.readFarmsFile(vid)
-        self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid, self.config['villages'][vid]['farms'])
+        self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid)
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
@@ -754,12 +833,13 @@ class travian(object):
                 attackData['y'] = farm['y']
                 attackData['type'] = 'raid'
                 attackInfo = 'from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
+                print('Trying attack ' + attackInfo)
                 isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + '][' + str(troopType) + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
                 if isSuccessful == False:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                         print('Does not have enough troops to send ' + attackInfo)
                         break
-                if isSuccessful:
+                if isSuccessful == True:
                     print('Farmed ' + attackInfo)
         self.saveFarmsFile(vid)
 
@@ -962,7 +1042,7 @@ class travian(object):
 
     def doesHaveEnoughTroops(self, vid, troopsToSend, refreshPage=True):
         if 'availableTroops' not in self.config['villages'][vid] or refreshPage:
-            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True, vid)
+            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True)
         for i in range(len(troopsToSend)):
             if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
                 return False
@@ -970,10 +1050,23 @@ class travian(object):
 
     # attackData = {'vid' : xxx, 'troops' : [xx, xx, xx, ...], 'sendHero'(optional) : True/False, 'villageName'(optional): '', 'x'(optional): xx, 'y'(optional): xx, 'type' : 'raid'/'normal'}
     def attack(self, attackData):
-
-        html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False, attackData['vid'])
-
+        print('trying attack ' + str(attackData))
+        troopType = troopTypeOfTroops(attackData['troops'])
+        html = ''
+        if attackData['troops'][troopType] == sum(attackData['troops']):
+            additionalLinkData = '&x=' + str(attackData['x']) + '&y=' + str(attackData['y'])
+            additionalLinkData += '&troops[0][t' + str(troopType+1) + ']=' + str(attackData['troops'][troopType])
+            if attackData['type'] == 'raid':
+                additionalLinkData += '&c=4'
+            else:
+                additionalLinkData += '&c=3'
+            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39' + additionalLinkData, {}, False)
+            time.sleep(0.1*randint(3, 6))
+        else:
+            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False)
+            sleep(5, 25)
         if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops'], False): #refreshPage = False
+            print('not enough troops to attack')
             return False
 
         data = getAttackData(html)
@@ -1008,6 +1101,7 @@ class travian(object):
         html = self.sendHTTPRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         if 'There is no village at these coordinates.' in html and 'farms' in self.config['villages'][attackData['vid']]:
+            print('No village at coordinates ' + str(data['x']) + "|" + str(data['y']))
             self.removeFarm({'x': attackData['x'], 'y': attackData['y']}, attackData['vid'])
             return False
 
@@ -1119,7 +1213,7 @@ class travian(object):
         self.addNewFarms(vid)
 
     def removeStaleFarms(self, vid):
-        tempfarms = self.config['villages'][vid]['farms'].copy()
+        tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
         realFarms = readDictionaryFromJson('farms.json')['farms']
         for farm in tempfarms:
             if not farmInFarms(farm, realFarms):
@@ -1130,7 +1224,7 @@ class travian(object):
                     exit(1)
 
     def addNewFarms(self, vid):
-        tempfarms = self.config['villages'][vid]['farms'].copy()
+        tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
         realFarms = readDictionaryFromJson('farms.json')['farms']
         for farm in realFarms:
             if not farmInFarms(farm, tempfarms):
@@ -1215,7 +1309,7 @@ class travian(object):
         self.config['villagesAmount']=villageAmount
         self.config['ajaxToken']=ajaxToken
 
-    def sendHTTPRequest(self, url, data={}, delay=True, vid="-1"):
+    def sendHTTPRequest(self, url, data={}, delay=True):
         if delay:
             time.sleep(randint(1,5))
         html = None
