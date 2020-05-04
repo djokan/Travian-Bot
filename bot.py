@@ -386,6 +386,9 @@ class travian(object):
         report['destination']['sent'] = []
         report['destination']['dead'] = []
 
+        if len(lastIndexes) < 4:
+            return
+
         for i in range(0, lastIndexes[0]):
             report['source']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
         for i in range(lastIndexes[0], lastIndexes[1]):
