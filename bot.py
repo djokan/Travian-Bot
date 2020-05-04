@@ -1366,7 +1366,7 @@ class travian(object):
                         time.sleep(randint(1,5))
 
         vid = getActiveVillageId(html.text)
-        if 'class="att1"' in html:
+        if 'class="att1"' in html.text:
             self.doOnceInSeconds(3600 * 8, self.playIncomingAttackSound, 'incomingAttackSound' + vid)
         if vid:
             data = {}
