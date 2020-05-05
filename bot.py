@@ -518,18 +518,10 @@ class travian(object):
             return False
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
-            r1 = int(int(r1)*coeff)
-            r2 = int(int(r2)*coeff)
-            r3 = int(int(r3)*coeff)
-            r4 = int(int(r4)*coeff)
-            r1 = r1-r1%100
-            r2 = r2-r2%100
-            r3 = r3-r3%100
-            r4 = r4-r4%100
-            r1 = str(r1)
-            r2 = str(r2)
-            r3 = str(r3)
-            r4 = str(r4)
+            r1 = str(int(round(int(r1)*coeff, -2)))
+            r2 = str(int(round(int(r2)*coeff, -2)))
+            r3 = str(int(round(int(r3)*coeff, -2)))
+            r4 = str(int(round(int(r4)*coeff, -2)))
         tempp = 0
         while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.79 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
             if tempp%4==0 and int(r1)>100:
@@ -691,7 +683,7 @@ class travian(object):
     def initFarmPeriods(self, vid, farm):
         periods = []
         for troopType in range(10):
-            periods.append(self.travelTime(vid, farm, troopType))
+            periods.append(int(self.travelTime(vid, farm, troopType)))
         return periods
 
     def getLastDayStatistics(self, farms, troopType):
@@ -852,14 +844,10 @@ class travian(object):
                 attackData['y'] = farm['y']
                 attackData['type'] = 'raid'
                 attackInfo = 'from ' + vid + ' to (' + str(farm['x']) + '/' + str(farm['y']) + ') with period ' + str(farm['period'][troopType]) + ' seconds, troops ' + str(attackData['troops'])
-                print('Trying attack ' + attackInfo)
                 isSuccessful = self.doOnceInSeconds(farm['period'][troopType], self.attack, 'attack[' + vid + '][' + str(troopType) + ']->(' + str(farm['x']) + '/' + str(farm['y']) + ')', attackData)
                 if isSuccessful == False:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
-                        print('Does not have enough troops to send ' + attackInfo)
                         break
-                if isSuccessful == True:
-                    print('Farmed ' + attackInfo)
         self.saveFarmsFile(vid)
 
     def resourceFieldLevelsSum(self, vid):
@@ -1069,7 +1057,7 @@ class travian(object):
 
     # attackData = {'vid' : xxx, 'troops' : [xx, xx, xx, ...], 'sendHero'(optional) : True/False, 'villageName'(optional): '', 'x'(optional): xx, 'y'(optional): xx, 'type' : 'raid'/'normal'}
     def attack(self, attackData):
-        print('trying attack ' + str(attackData))
+        print('Trying attack ' + str(attackData))
         troopType = troopTypeOfTroops(attackData['troops'])
         html = ''
         if attackData['troops'][troopType] == sum(attackData['troops']):
@@ -1085,7 +1073,7 @@ class travian(object):
             html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, False)
             sleep(5, 25)
         if not self.doesHaveEnoughTroops(attackData['vid'], attackData['troops'], False): #refreshPage = False
-            print('not enough troops to attack')
+            print('Not enough troops to attack ' + str(attackData))
             return False
 
         data = getAttackData(html)
@@ -1131,7 +1119,7 @@ class travian(object):
         for key in data:
             if data[key] == None:
                 print(html)
-                print('attacking failed')
+                print('Attacking failed!')
                 return False
         print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
         self.sendHTTPRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
