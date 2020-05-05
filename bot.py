@@ -37,7 +37,7 @@ initialTroopsForFarming.append([0, 0, 0, 0, 0, 5, 0, 0, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 5, 0, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 5, 0, 0])
 initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 5, 0])
-initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])\
+initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
 
 reportPrototype = {"type": 1, "timestamp": 100000000000000000000000, "source": {"sent": [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 10, "y": 10, "lost": 0}, "destination": {"sent": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 20, "y": 10, "lost": 0}, "stolen": 250, "capacity": 250}
 
