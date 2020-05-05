@@ -518,10 +518,10 @@ class travian(object):
             return False
         if int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry:
             coeff = 1.0*available*cancarry/(int(r1)+int(r2)+int(r3)+int(r4))
-            r1 = str(int(round(int(r1)*coeff, -2)))
-            r2 = str(int(round(int(r2)*coeff, -2)))
-            r3 = str(int(round(int(r3)*coeff, -2)))
-            r4 = str(int(round(int(r4)*coeff, -2)))
+            r1 = str(int(round(int(r1)*coeff, -2))+100)
+            r2 = str(int(round(int(r2)*coeff, -2))+100)
+            r3 = str(int(round(int(r3)*coeff, -2))+100)
+            r4 = str(int(round(int(r4)*coeff, -2))+100)
         tempp = 0
         while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.79 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
             if tempp%4==0 and int(r1)>100:
