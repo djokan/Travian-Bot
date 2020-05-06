@@ -238,6 +238,7 @@ class travian(object):
         self.login()
         while 1:
             self.getConfig(False) # don't shutdown if error
+            self.doOnceInSeconds(24 * 3600, self.autoSearchFarms, 'autoSearchFarms')
             try:
                 if self.loggedIn==False:
                     self.login()
@@ -317,6 +318,42 @@ class travian(object):
             return False
         print(self.config['villages']["1"]['farms'])
         return True
+    
+    def autoSearchFarms(self):
+        if 'autoSearchFarms' not in self.config or self.config['autoSearchFarms'] != 'true':
+            return
+        print('Searching for new farms')
+        html = self.session.get("https://www.inactivesearch.it/en/inactives/ts4.travian.com?c=0|0",headers = self.config['headers'])
+        html = html.text
+        pagesNumber = int(getRegexValue(html, '<span>1/(\\d+)</span>'))
+        realFarms = readDictionaryFromJson('farms.json')['farms']
+        for i in range(1, pagesNumber + 1):
+            print(str(i) + '/' + str(pagesNumber + 1))
+            time.sleep(1)
+            html = self.session.get("https://www.inactivesearch.it/en/inactives/" + self.congig["server"] + "?c=0|0&page=" + str(i), headers = self.config['headers'])
+            html = html.text
+            farms = getRegexValues(html, '(<tr class="tribe-\\d">((?!</tr).)*</tr)')
+            for temp in farms:
+                farm = temp[0]
+
+                populations = getRegexValues(getRegexValue(farm, 'build.php.*'), '<td>(\\d+)[^\\.\\d]')
+                if len(populations) != 5:
+                    print(farm)
+                    print(populations)
+                    exit(1)
+                populationChanged = False
+                for ii in range(3):
+                    if populations[ii]!=populations[0]:
+                        populationChanged = True
+                if (populationChanged == False and 'aid=0' in farm) or 'Natars' in farm:
+                    coordinates = getRegexValues(farm, 'class="text-muted">\\((-?\\d+)|(-?\\d+)\\)')
+                    x = int(coordinates[0][0])
+                    y = int(coordinates[1][1])
+                    if x%100 != 0 or y%100 != 0: # don't farm ww village
+                        if farmInFarms({'x': x, 'y': y}, realFarms) == False:
+                            realFarms.append({'x': x, 'y': y})
+        print('Finished searching for new farms')
+        saveDictionaryToJson({'farms': realFarms}, 'farms.json')
 
     def playIncomingAttackSound(self):
         filename = 'res/incomingAttack.wav'
@@ -402,17 +439,25 @@ class travian(object):
         report['destination']['sent'] = []
         report['destination']['dead'] = []
 
-        if len(lastIndexes) < 4:
+        unknownEnemyTroops = False
+        if len(lastIndexes) > 2 and getRegexValue(troops[lastIndexes[1]],'>(\\d+)<') == "?":
+            unknownEnemyTroops = True
+            
+        if len(lastIndexes) < 4 and unknownEnemyTroops == False:
             return
 
         for i in range(0, lastIndexes[0]):
             report['source']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
         for i in range(lastIndexes[0], lastIndexes[1]):
             report['source']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
-        for i in range(lastIndexes[1], lastIndexes[2]):
-            report['destination']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
-        for i in range(lastIndexes[2], lastIndexes[3]):
-            report['destination']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+        if unknownEnemyTroops:
+            report['destination']['sent'] = [5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000]
+            report['destination']['dead'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        else:
+            for i in range(lastIndexes[1], lastIndexes[2]):
+                report['destination']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+            for i in range(lastIndexes[2], lastIndexes[3]):
+                report['destination']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
 
         villages = getRegexValues(html,'karte.php.d=(\\d*)"')
 
@@ -523,14 +568,14 @@ class travian(object):
             r3 = str(int(round(int(r3)*coeff, -2))+100)
             r4 = str(int(round(int(r4)*coeff, -2))+100)
         tempp = 0
-        while (int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.79 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold():
-            if tempp%4==0 and int(r1)>100:
+        while (int(r1)+int(r2)+int(r3)+int(r4)>available*cancarry) or ((int(r1)+int(r2)+int(r3)+int(r4))%cancarry>0 and (int(r1)+int(r2)+int(r3)+int(r4))%cancarry<cancarry*0.79 and int(r1)+int(r2)+int(r3)+int(r4)>self.getMinMarketTreshold()):
+            if tempp%4==0 and int(r1)>=100:
                 r1 = str(int(r1)-100)
-            if tempp%4==1 and int(r2)>100:
+            if tempp%4==1 and int(r2)>=100:
                 r2 = str(int(r2)-100)
-            if tempp%4==2 and int(r3)>100:
+            if tempp%4==2 and int(r3)>=100:
                 r3 = str(int(r3)-100)
-            if tempp%4==3 and int(r4)>100:
+            if tempp%4==3 and int(r4)>=100:
                 r4 = str(int(r4)-100)
             tempp = tempp+1
         print('Trying to send ' + vid + ' ('+str(r1)+','+str(r2)+','+str(r3)+','+str(r4)+') to ('+str(x)+'|'+str(y)+')')
