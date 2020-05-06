@@ -802,6 +802,7 @@ class travian(object):
 
     def alignPeriod(self, vid, troopType, numberOfFarms = -1):
         self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['period'][troopType])
+        troopCapacity = min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
         if numberOfFarms < 0:
             cumulativeTroopsNeeded = [0]
             for i in range(len(self.config['villages'][vid]['farms'])):
@@ -812,13 +813,13 @@ class travian(object):
             numberOfFarms = len(self.config['villages'][vid]['farms'])
             for i in range(len(self.config['villages'][vid]['farms'])):
                 newperiod = self.config['villages'][vid]['farms'][i]['period'][troopType]
-                newperiod *= cumulativeTroopsNeeded[i]/self.config['villages'][vid]['troopCapacity'][troopType]
+                newperiod *= cumulativeTroopsNeeded[i]/troopCapacity
                 if newperiod > 12* 3600:
                     numberOfFarms = i
                     break
         troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
-        while abs(troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType] - 1) > 0.01:
-            periodAlign = troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType]
+        while abs(troopsNeeded/troopCapacity - 1) > 0.01:
+            periodAlign = troopsNeeded/troopCapacity
             for i in range(numberOfFarms):
                 self.config['villages'][vid]['farms'][i]['period'][troopType] *= periodAlign
                 self.config['villages'][vid]['farms'][i]['period'][troopType] = int(self.config['villages'][vid]['farms'][i]['period'][troopType])
@@ -1269,36 +1270,39 @@ class travian(object):
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
-    def getNumberOrTroops(self, vid, troopType):
-        html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39')
+    def getNumberOfTroops(self, vid, troopType):
+        self.sendHTTPRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
+        self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39')
         currentTroops = self.config['villages'][vid]['availableTroops'][troopType]
         sentAttacks = readDictionaryFromJson('data/sentAttacksLog.json')
-        for attack in sentAttacks['sent']:
-            if vid != attack['attackData']['vid']:
-                continue
-            travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
-            oneWayTravelTime = travelTime / 2
-            if time.time() - travelTime > attack['attackData']['timestamp']:
-                continue
-            if time.time() - oneWayTravelTime < attack['attackData']['timestamp']:
-                continue
-            currentTroops += attack['attackData']['troops'][troopType]
+        if 'sent' in sentAttacks:
+            for attack in sentAttacks['sent']:
+                if vid != attack['attackData']['vid']:
+                    continue
+                travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
+                oneWayTravelTime = travelTime / 2
+                if time.time() - travelTime > attack['timestamp']:
+                    continue
+                if time.time() - oneWayTravelTime < attack['timestamp']:
+                    continue
+                currentTroops += attack['attackData']['troops'][troopType]
         
-        for report in self.config['reports']:
+        for reportKey in self.config['reports']:
+            report = self.config['reports'][reportKey]
             if report['source']['x'] != self.config['villages'][vid]['x'] or report['source']['y'] != self.config['villages'][vid]['y']:
                 continue 
             oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
             if time.time() - oneWayTravelTime > report['timestamp']:
                 continue
             currentTroops += attack['source']['sent'][troopType]
-        self.debugLog('getNumberOrTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
+        self.debugLog('getNumberOfTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
         return currentTroops
 
     def debugLog(self, log):
         logs = readDictionaryFromJson('data/debugLogs.json')
         if 'logs' not in logs:
             logs['logs'] = []
-        logs.append(log)
+        logs['logs'].append(log)
         saveDictionaryToJson(logs, 'data/debugLogs.json')
 
     def readFarmsFile(self, vid):
@@ -1478,7 +1482,7 @@ class travian(object):
                 self.config['villages'][vid]['dorf2html']=html.text
             if 'build.php' in url:
                 data = self.analysisBuild(html.text)
-            if 'build.php?tt=2&id=39' in url:
+            if 'build.php' in url and 'tt=2&id=39' in url:
                 data = self.analysisSendTroops(html.text)
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
