@@ -845,6 +845,7 @@ class travian(object):
 
         if maximalFighthingStrength == 1000000000:
             troops = self.getEqualOrMoreFightingStrengthTroops(minimalFighthingStrength, troopType)
+            addTroop(troops, -1)
             mulTroop(troops, 2)
             return troops
 
@@ -1107,7 +1108,7 @@ class travian(object):
 
     def doesHaveEnoughTroops(self, vid, troopsToSend, refreshPage=True):
         if 'availableTroops' not in self.config['villages'][vid] or refreshPage:
-            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39', {}, True)
+            html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39')
         for i in range(len(troopsToSend)):
             if troopsToSend[i] > self.config['villages'][vid]['availableTroops'][i]:
                 return False
@@ -1180,6 +1181,7 @@ class travian(object):
                 print('Attacking failed!')
                 return False
         print('Attacking village (' + data['x'] + '|' + data['y'] + ')' + ' with troops ' + str(attackData['troops']))
+        self.saveToSentTroopsLog(attackData)
         self.sendHTTPRequest(self.config['server'] + 'build.php?gid=16&tt=2', data, False)
         time.sleep(0.1*randint(3, 6))
         return True
@@ -1267,6 +1269,38 @@ class travian(object):
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
+    def getNumberOrTroops(self, vid, troopType):
+        html = self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39')
+        currentTroops = self.config['villages'][vid]['availableTroops'][troopType]
+        sentAttacks = readDictionaryFromJson('data/sentAttacksLog.json')
+        for attack in sentAttacks['sent']:
+            if vid != attack['attackData']['vid']:
+                continue
+            travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
+            oneWayTravelTime = travelTime / 2
+            if time.time() - travelTime > attack['attackData']['timestamp']:
+                continue
+            if time.time() - oneWayTravelTime < attack['attackData']['timestamp']:
+                continue
+            currentTroops += attack['attackData']['troops'][troopType]
+        
+        for report in self.config['reports']:
+            if report['source']['x'] != self.config['villages'][vid]['x'] or report['source']['y'] != self.config['villages'][vid]['y']:
+                continue 
+            oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
+            if time.time() - oneWayTravelTime > report['timestamp']:
+                continue
+            currentTroops += attack['source']['sent'][troopType]
+        self.debugLog('getNumberOrTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
+        return currentTroops
+
+    def debugLog(self, log):
+        logs = readDictionaryFromJson('data/debugLogs.json')
+        if 'logs' not in logs:
+            logs['logs'] = []
+        logs.append(log)
+        saveDictionaryToJson(logs, 'data/debugLogs.json')
+
     def readFarmsFile(self, vid):
         filename = 'farms_' + vid + '.json'
         filepath = 'data/' + filename
@@ -1276,6 +1310,24 @@ class travian(object):
 
         self.removeStaleFarms(vid)
         self.addNewFarms(vid)
+
+    def saveToSentTroopsLog(self, attackData):
+        filepath = 'data/sentAttacksLog.json'
+        sentAttacks = readDictionaryFromJson(filepath)
+        current = {}
+        current['timestamp'] = int(time.time())
+        current['attackData'] = attackData
+        if 'sent' not in sentAttacks:
+            sentAttacks['sent'] = []
+        sentAttacks['sent'].append(current)
+        self.doOnceInSeconds(3600, self.deleteOldSentTroopsLogs, 'deleteOldSentTroopsLogs')
+        saveDictionaryToJson(sentAttacks, filepath)
+
+    def deleteOldSentTroopsLogs(self):
+        filepath = 'data/sentAttacksLog.json'
+        sentAttacks = readDictionaryFromJson(filepath)
+        sentAttacks['sent'] = [attack for attack in sentAttacks['sent'] if attack['timestamp'] > int(time.time()) - 24*3600]
+        saveDictionaryToJson(sentAttacks, filepath)
 
     def removeStaleFarms(self, vid):
         tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
@@ -1287,7 +1339,7 @@ class travian(object):
 
                 if farmInFarms(farm, self.config['villages'][vid]['farms']):
                     exit(1)
-
+        
     def addNewFarms(self, vid):
         tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
         realFarms = readDictionaryFromJson('farms.json')['farms']
