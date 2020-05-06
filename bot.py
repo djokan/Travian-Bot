@@ -1302,7 +1302,7 @@ class travian(object):
         logs = readDictionaryFromJson('data/debugLogs.json')
         if 'logs' not in logs:
             logs['logs'] = []
-        logs['logs'].append(log)
+        logs['logs'].append({'log': log, 'timestamp': time.time()})
         saveDictionaryToJson(logs, 'data/debugLogs.json')
 
     def readFarmsFile(self, vid):
