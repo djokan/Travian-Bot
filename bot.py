@@ -238,6 +238,7 @@ class travian(object):
         self.login()
         while 1:
             self.getConfig(False) # don't shutdown if error
+
             self.doOnceInSeconds(24 * 3600, self.autoSearchFarms, 'autoSearchFarms')
             try:
                 if self.loggedIn==False:
@@ -291,9 +292,10 @@ class travian(object):
         self.config['villages']["1"]['y'] = 10
         self.config['villages']["1"]['troopCapacity'] = [5, 0, 0, 0, 5, 0, 0, 0, 0, 0]
         self.config['villages']["1"]['farms'] = [{"x": 10, "y": 16, "period": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 16, "y": 10, "period": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 500, "y": 500, "period": [10000, 0, 0, 0, 10000, 0, 0, 0, 0, 0]}]
-        self.alignPeriod("1", 0, 2)
-        self.alignPeriod("1", 4, 2)
-        self.config['villages']["1"]['farms'][2]["period"] = [10000, 0, 0, 0, 10000, 0, 0, 0, 0, 0]
+        self.alignPeriod("1", 0)
+        self.alignPeriod("1", 4)
+        self.config['villages']["1"]['farms'][2]["period"] = [150000, 0, 0, 0, 150000, 0, 0, 0, 0, 0]
+        print(self.config['villages']["1"]['farms'])
         self.calculateFarmPeriods("1")
         if self.calculateTroopsToSend("1", self.config['villages']["1"]['farms'][0], 0) != [5, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
             print('calculateTroopsToSend1 failed')
@@ -316,12 +318,17 @@ class travian(object):
             print('calculateTroopsNeeded1 failed')
             print(troopsNeeded)
             return False
+        troopsNeeded = self.calculateTroopsNeeded("1", 4, 2)
+        if troopsNeeded > 6 or troopsNeeded < 4:
+            print('calculateTroopsNeeded2 failed')
+            print(troopsNeeded)
+            return False
         print(self.config['villages']["1"]['farms'])
         return True
     
     def autoSearchFarms(self):
         if 'autoSearchFarms' not in self.config or self.config['autoSearchFarms'] != 'true':
-            return
+            return False
         base_link = "https://www.inactivesearch.it/en/inactives/" + getRegexValue(self.config["server"], '//(.*)/') + "?c=0|0"
         print('Searching for new farms')
         html = self.session.get(base_link,headers = self.config['headers'])
@@ -355,6 +362,7 @@ class travian(object):
                             realFarms.append({'x': x, 'y': y})
         print('Finished searching for new farms')
         saveDictionaryToJson({'farms': realFarms}, 'farms.json')
+        return True
 
     def playIncomingAttackSound(self):
         filename = 'res/incomingAttack.wav'
@@ -747,24 +755,23 @@ class travian(object):
                     farm['stolen'] += report['stolen']
                     farm['capacity'] += report['capacity']
 
-    def calculateCoefficients(self, vid, farms, troopType):
+    def calculateCoefficientsAndUnalignedPeriods(self, vid, farms, troopType):
         self.getLastDayStatistics(farms, troopType)
-        avgCoefficient = 0.0001 # avgCoefficient = (oldPeriod1 + oldPeriod2 + ...) / (newPeriod1 + newPeriod2 + ...)
-        oldPeriodSum = 0
-        newPeriodSum = 0
+        numberOfChangedPeriods = 0
         for farm in farms:
             if 'stolen' in farm:
-                averageStealPercent = farm['stolen'] / farm['capacity']
-                farm['coefficient'] = 0.0000000001 + averageStealPercent / self.travelTime(vid, farm, troopType)
-                oldPeriodSum += farm['period'][troopType]
-                newPeriodSum += farm['period'][troopType] / farm['coefficient']
-        if oldPeriodSum > 0:
-            avgCoefficient = oldPeriodSum / newPeriodSum
+                averageStealPercent = 40 * farm['stolen'] / farm['capacity'] + 80 # we want periods to slowly change
+                # we want coefficients bigger than 1 because self.alignPeriod will change lowest periods
+                farm['coefficient'] = 1000000 * averageStealPercent / self.travelTime(vid, farm, troopType)
+                numberOfChangedPeriods += 1
         for farm in farms:
-            if 'stolen' not in farm:
-                farm['coefficient'] = avgCoefficient
             if 'stolen' in farm and farm['stolen']/farm['capacity'] > 0.95:
-                farm['coefficient'] = max(farm['coefficient'], avgCoefficient*2)
+                farm['coefficient'] *= 2
+        for farm in farms:
+            if 'stolen' in farm:
+                farm['period'][troopType] /= farm['coefficient']
+        self.alignPeriod(vid, troopType, numberOfChangedPeriods)
+        
 
     def calculateFarmPeriods(self, vid):
         farms = self.config['villages'][vid]['farms']
@@ -779,20 +786,9 @@ class travian(object):
                 if not 'period' in farm:
                     farm['period'] = self.initFarmPeriods(vid, farm)
 
-            self.calculateCoefficients(vid, farms, troopType)
-
+            self.calculateCoefficientsAndUnalignedPeriods(vid, farms, troopType)
+            self.alignPeriod(vid, troopType)
             for farm in farms:
-                farm['period'][troopType] /= farm['coefficient']
-
-            farms = sorted(farms, key = lambda i: i['period'][troopType])
-
-            numberOfFarms = len(farms)
-            self.alignPeriod(vid, troopType, numberOfFarms)
-            while farms[numberOfFarms - 1]['period'][troopType] > 12*3600:
-                numberOfFarms -= 1
-                self.alignPeriod(vid, troopType, numberOfFarms)
-            for farm in farms:
-                farm['period'][troopType] = int(farm['period'][troopType])
                 tempfarm = copy.deepcopy(farm)
                 for key in tempfarm:
                     if key != 'x' and key != 'y' and key != 'period':
@@ -806,12 +802,28 @@ class travian(object):
             troopsNeeded += float(self.calculateTroopsToSend(vid, farm, troopType)[troopType]) * self.travelTime(vid, farm, troopType) / farm['period'][troopType]
         return troopsNeeded
 
-    def alignPeriod(self, vid, troopType, numberOfFarms):
+    def alignPeriod(self, vid, troopType, numberOfFarms = -1):
+        self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['period'][troopType])
+        if numberOfFarms < 0:
+            cumulativeTroopsNeeded = [0]
+            for i in range(len(self.config['villages'][vid]['farms'])):
+                farm = self.config['villages'][vid]['farms'][i]
+                lastElem = cumulativeTroopsNeeded[-1]
+                cumulativeTroopsNeeded.append(lastElem + float(self.calculateTroopsToSend(vid, farm, troopType)[troopType]) * self.travelTime(vid, farm, troopType) / farm['period'][troopType])
+            cumulativeTroopsNeeded = cumulativeTroopsNeeded[1:]
+            numberOfFarms = len(self.config['villages'][vid]['farms'])
+            for i in range(len(self.config['villages'][vid]['farms'])):
+                newperiod = self.config['villages'][vid]['farms'][i]['period'][troopType]
+                newperiod *= cumulativeTroopsNeeded[i]/self.config['villages'][vid]['troopCapacity'][troopType]
+                if newperiod > 12* 3600:
+                    numberOfFarms = i
+                    break
         troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
         while abs(troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType] - 1) > 0.01:
             periodAlign = troopsNeeded/self.config['villages'][vid]['troopCapacity'][troopType]
-            for i in range(len(self.config['villages'][vid]['farms'])):
+            for i in range(numberOfFarms):
                 self.config['villages'][vid]['farms'][i]['period'][troopType] *= periodAlign
+                self.config['villages'][vid]['farms'][i]['period'][troopType] = int(self.config['villages'][vid]['farms'][i]['period'][troopType])
             troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
 
     def calculateTroopsToSend(self, vid, farm, troopType):
