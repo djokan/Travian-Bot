@@ -140,7 +140,7 @@ def getRegexValues(stringFrom, regex):
 
 def getRegexValue(stringFrom,regex):
     temp = getRegexValues(stringFrom, regex)
-    if temp == None:
+    if temp == None or len(temp) < 1:
         return None
     else:
         return temp[0]
@@ -434,7 +434,7 @@ class travian(object):
 
         report['timestamp'] = timestamp
 
-        troops = getRegexValues(html,'class="unit[^>]*>\\d+</td>')
+        troops = getRegexValues(html,'class="unit[^>]*>[\\d\\?]+</td>')
 
         lastIndexes = []
 
@@ -449,40 +449,38 @@ class travian(object):
         report['destination']['dead'] = []
 
         unknownEnemyTroops = False
-        if len(lastIndexes) > 2 and getRegexValue(troops[lastIndexes[1]],'>(\\d+)<') == "?":
+        if len(lastIndexes) > 2 and getRegexValue(troops[lastIndexes[1]],'>([\\d\\?]+)<') == "?":
             unknownEnemyTroops = True
             
         if len(lastIndexes) < 4 and unknownEnemyTroops == False:
             return
 
         for i in range(0, lastIndexes[0]):
-            report['source']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+            report['source']['sent'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
         for i in range(lastIndexes[0], lastIndexes[1]):
-            report['source']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+            report['source']['dead'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
         if unknownEnemyTroops:
             report['destination']['sent'] = [5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000]
             report['destination']['dead'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         else:
             for i in range(lastIndexes[1], lastIndexes[2]):
-                report['destination']['sent'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+                report['destination']['sent'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
             for i in range(lastIndexes[2], lastIndexes[3]):
-                report['destination']['dead'].append(int(getRegexValue(troops[i],'>(\\d+)<')))
+                report['destination']['dead'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
 
         villages = getRegexValues(html,'karte.php.d=(\\d*)"')
 
         report['source'] = mergeDict(report['source'], getVillageCoordinatesFromD(int(villages[0])))
         report['destination'] = mergeDict(report['destination'], getVillageCoordinatesFromD(int(villages[1])))
+        if unknownEnemyTroops == False:
+            lost = getRegexValues(html,'resources_medium">[^&]*&#x202d;([^&]*)&')
+            report['source']['lost'] = int(lost[0].replace(',',''))
+            report['destination']['lost'] = int(lost[1].replace(',',''))
 
-        lost = getRegexValues(html,'resources_medium">[^&]*&#x202d;([^&]*)&')
-        report['source']['lost'] = int(lost[0].replace(',',''))
-        report['destination']['lost'] = int(lost[1].replace(',',''))
-
-
-        stolen = getRegexValue(html,'title="carry" />&#x202d;&#x202d;(\\d*)&')
-        report['stolen'] = int(stolen)
-        capacity = getRegexValue(html,'title="carry" />&#x202d;&#x202d;\\d*&#x202c;/&#x202d;(\\d*)&')
-        report['capacity'] = int(capacity)
-
+            stolen = getRegexValue(html,'title="carry" />&#x202d;&#x202d;(\\d*)&')
+            report['stolen'] = int(stolen)
+            capacity = getRegexValue(html,'title="carry" />&#x202d;&#x202d;\\d*&#x202c;/&#x202d;(\\d*)&')
+            report['capacity'] = int(capacity)
         self.config['reports'][getBattleId(battleUrl)] = report
 
     def getNextSleepDelay(self):
@@ -1174,7 +1172,9 @@ class travian(object):
         data = {}
         data['redeployHero'] = ''
         data = mergeDict(data, getAttackData2(html))
-        data['a'] = getRegexValue(html,'value="([^"]*)" name="a" id="btn_ok"')
+        data['a'] = getRegexValue(html, 'value="([^"]*)" name="a" id="btn_ok"')
+        if 'beginner&#39;s protection' in html:
+            return True
         for key in data:
             if data[key] == None:
                 print(html)
@@ -1326,6 +1326,8 @@ class travian(object):
     def deleteOldSentTroopsLogs(self):
         filepath = 'data/sentAttacksLog.json'
         sentAttacks = readDictionaryFromJson(filepath)
+        if 'sent' not in sentAttacks:
+            sentAttacks['sent'] = []
         sentAttacks['sent'] = [attack for attack in sentAttacks['sent'] if attack['timestamp'] > int(time.time()) - 24*3600]
         saveDictionaryToJson(sentAttacks, filepath)
 
