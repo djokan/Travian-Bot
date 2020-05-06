@@ -836,7 +836,7 @@ class travian(object):
                         minimalFighthingStrength = max(minimalFighthingStrength, self.getFighthingStrength(report['source']['sent'])+1)
                     if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
                         maximalFighthingStrength = min(maximalFighthingStrength, self.getFighthingStrength(report['source']['sent']))
-                if report['destination']['sent'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
+                if report['destination']['sent'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and sum(report['destination']['sent'])>5:
                     return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         if maximalFighthingStrength == 1000000000 and minimalFighthingStrength == 1:
@@ -1294,7 +1294,7 @@ class travian(object):
             oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
             if time.time() - oneWayTravelTime > report['timestamp']:
                 continue
-            currentTroops += attack['source']['sent'][troopType]
+            currentTroops += report['source']['sent'][troopType]
         self.debugLog('getNumberOfTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
         return currentTroops
 
