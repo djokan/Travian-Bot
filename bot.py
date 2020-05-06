@@ -322,15 +322,16 @@ class travian(object):
     def autoSearchFarms(self):
         if 'autoSearchFarms' not in self.config or self.config['autoSearchFarms'] != 'true':
             return
+        base_link = "https://www.inactivesearch.it/en/inactives/" + getRegexValue(self.config["server"], '//(.*)/') + "?c=0|0"
         print('Searching for new farms')
-        html = self.session.get("https://www.inactivesearch.it/en/inactives/ts4.travian.com?c=0|0",headers = self.config['headers'])
+        html = self.session.get(base_link,headers = self.config['headers'])
         html = html.text
         pagesNumber = int(getRegexValue(html, '<span>1/(\\d+)</span>'))
         realFarms = readDictionaryFromJson('farms.json')['farms']
         for i in range(1, pagesNumber + 1):
-            print(str(i) + '/' + str(pagesNumber + 1))
+            print(str(i) + '/' + str(pagesNumber))
             time.sleep(1)
-            html = self.session.get("https://www.inactivesearch.it/en/inactives/" + self.congig["server"] + "?c=0|0&page=" + str(i), headers = self.config['headers'])
+            html = self.session.get(base_link + "&page=" + str(i), headers = self.config['headers'])
             html = html.text
             farms = getRegexValues(html, '(<tr class="tribe-\\d">((?!</tr).)*</tr)')
             for temp in farms:
