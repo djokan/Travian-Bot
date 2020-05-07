@@ -64,13 +64,7 @@ def troopTypeOfTroops(troops):
     return maxType
 
 def troopTypeOfReport(report):
-    maxTroops = 0
-    maxType = 0
-    for i in range(len(report['source']['sent'])):
-        if report['source']['sent'][i] > maxTroops:
-            maxTroops = report['source']['sent'][i]
-            maxType = i
-    return maxType
+    return troopTypeOfTroops(report['source']['sent'])
 
 def getActiveVillageId(html):
     temp = getRegexValues(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
@@ -730,7 +724,7 @@ class travian(object):
         return True
 
     def travelTime(self, vid, farm, troopType):
-        return math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/troopSpeed[self.config['tribe']][troopType]
+        return int(math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/troopSpeed[self.config['tribe']][troopType])
 
     def initFarmPeriods(self, vid, farm):
         periods = []
@@ -1279,22 +1273,24 @@ class travian(object):
             for attack in sentAttacks['sent']:
                 if vid != attack['attackData']['vid']:
                     continue
-                travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
-                oneWayTravelTime = travelTime / 2
-                if time.time() - travelTime > attack['timestamp']:
+                if troopTypeOfTroops(attack['attackData']['troops']) != troopType:
                     continue
-                if time.time() - oneWayTravelTime < attack['timestamp']:
+                travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
+                oneWayTravelTime = int(travelTime / 2)
+                if time.time() > attack['timestamp'] + oneWayTravelTime:
                     continue
                 currentTroops += attack['attackData']['troops'][troopType]
         
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
             if report['source']['x'] != self.config['villages'][vid]['x'] or report['source']['y'] != self.config['villages'][vid]['y']:
-                continue 
-            oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
-            if time.time() - oneWayTravelTime > report['timestamp']:
                 continue
-            currentTroops += report['source']['sent'][troopType]
+            if troopTypeOfReport(report) != troopType:
+                continue
+            oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
+            if time.time() > report['timestamp'] + oneWayTravelTime:
+                continue
+            currentTroops += report['source']['sent'][troopType] - report['source']['dead'][troopType]
         self.debugLog('getNumberOfTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
         return currentTroops
 
