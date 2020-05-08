@@ -1169,7 +1169,7 @@ class travian(object):
         data['redeployHero'] = ''
         data = mergeDict(data, getAttackData2(html))
         data['a'] = getRegexValue(html, 'value="([^"]*)" name="a" id="btn_ok"')
-        if 'beginner&#39;s protection' in html or 'is banned' in html:
+        if 'class="error"' in html:
             return True
         for key in data:
             if data[key] == None:
