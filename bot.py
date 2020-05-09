@@ -664,7 +664,7 @@ class travian(object):
         data=getAdventureData(html)
         for key in data:
             if data[key]==None:
-                return False
+                return True
         print(data)
         html=self.sendHTTPRequest(self.config['server']+'start_adventure.php',data)
         return True
