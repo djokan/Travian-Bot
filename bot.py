@@ -41,6 +41,34 @@ initialTroopsForFarming.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 5])
 
 reportPrototype = {"type": 1, "timestamp": 100000000000000000000000, "source": {"sent": [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 10, "y": 10, "lost": 0}, "destination": {"sent": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "dead": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "x": 20, "y": 10, "lost": 0}, "stolen": 250, "capacity": 250}
 
+def getPlayersDataFromMap(map):
+    players = {}
+    villages = getRegexValues(map, 'VALUES \\((\\d+),(-?\\d+),(-?\\d+),(\\d),(\\d+),\'([^\']*)\',(\\d+),\'([^\']*)\',(\\d+),\'([^\']*)\',(\\d+)\\)')
+    for villageData in villages:
+        fieldId = int(villageData[0])
+        x = int(villageData[1])
+        y = int(villageData[2])
+        tribeId = int(villageData[3])
+        villageId = int(villageData[4])
+        villageName = villageData[5]
+        playerId = int(villageData[6])
+        playerName = villageData[7]
+        allianceId = int(villageData[8])
+        allianceName = villageData[9]
+        population = int(villageData[10])
+
+        if playerId not in players:
+            players[playerId] = {'villages': {}, 'tribeId': tribeId, 'playerName': playerName, 'allianceId': allianceId, 'allianceName': allianceName}
+        players[playerId]['villages'][villageId] = {'fieldId' : fieldId, 'x': x, 'y': y, 'villageName': villageName, 'population': population}
+    return players
+
+def getPlayerPopulation(player):
+    population = 0
+    for villageKey in player['villages']:
+        village = player['villages'][villageKey]
+        population += village['population']
+    return population
+
 def parseVillageCoordinates(html):
     data = {}
     temp = getRegexValue(html, 'newdid=(\\d+)[^\\d][^>]*class="active"((?!coordinateX).)*coordinateX">[^;]*;(\\d+)[^\\d][^<]*<((?!coordinateY).)*coordinateY">[^;]*;(\\d+)[^\\d][^<]*<')
@@ -214,7 +242,7 @@ def getVillageCoordinatesFromD(d):
     return coords
 class travian(object):
     def __init__(self):
-        if len(sys.argv) > 1:
+        if len(sys.argv) > 1 and sys.argv[1] == 'test':
             if self.test() == True:
                 print('Test passed')
             else:
@@ -233,7 +261,7 @@ class travian(object):
         while 1:
             self.getConfig(False) # don't shutdown if error
 
-            self.doOnceInSeconds(24 * 3600, self.autoSearchFarms, 'autoSearchFarms')
+            self.doOnceInSeconds(1 * 3600, self.autoSearchFarms, 'autoSearchFarms')
             try:
                 if self.loggedIn==False:
                     self.login()
@@ -323,37 +351,47 @@ class travian(object):
     def autoSearchFarms(self):
         if 'autoSearchFarms' not in self.config or self.config['autoSearchFarms'] != 'true':
             return False
-        base_link = "https://www.inactivesearch.it/en/inactives/" + getRegexValue(self.config["server"], '//(.*)/') + "?c=0|0"
+        playerDataHistory = readDictionaryFromJson('data/playerDataHistory.json')
+        if 'data' not in playerDataHistory:
+            playerDataHistory['data'] = {}
+        playerDataHistory = playerDataHistory['data']
+        currentDateTimestamp = int(time.mktime(datetime.datetime.today().timetuple()))
+        
+        if currentDateTimestamp in playerDataHistory:
+            return True
+        url = self.config["server"] + "map.sql"
         print('Searching for new farms')
-        html = self.session.get(base_link,headers = self.config['headers'])
-        html = html.text
-        pagesNumber = int(getRegexValue(html, '<span>1/(\\d+)</span>'))
-        realFarms = readDictionaryFromJson('farms.json')['farms']
-        for i in range(1, pagesNumber + 1):
-            print(str(i) + '/' + str(pagesNumber))
-            time.sleep(1)
-            html = self.session.get(base_link + "&page=" + str(i), headers = self.config['headers'])
-            html = html.text
-            farms = getRegexValues(html, '(<tr class="tribe-\\d">((?!</tr).)*</tr)')
-            for temp in farms:
-                farm = temp[0]
+        map = self.session.get(url, headers = self.config['headers'])
+        map = map.text
+        players = getPlayersDataFromMap(map)
+        playerDataHistory[currentDateTimestamp] = players
+        saveDictionaryToJson({'data': playerDataHistory}, 'data/playerDataHistory.json')
 
-                populations = getRegexValues(getRegexValue(farm, 'build.php.*'), '<td>(\\d+)[^\\.\\d]')
-                if len(populations) != 5:
-                    print(farm)
-                    print(populations)
-                    exit(1)
-                populationChanged = False
-                for ii in range(3):
-                    if populations[ii]!=populations[0]:
-                        populationChanged = True
-                if (populationChanged == False and 'aid=0' in farm) or 'Natars' in farm:
-                    coordinates = getRegexValues(farm, 'class="text-muted">\\((-?\\d+)|(-?\\d+)\\)')
-                    x = int(coordinates[0][0])
-                    y = int(coordinates[1][1])
-                    if x%100 != 0 or y%100 != 0: # don't farm ww village
-                        if farmInFarms({'x': x, 'y': y}, realFarms) == False:
-                            realFarms.append({'x': x, 'y': y})
+        playersTemp = copy.deepcopy(players)
+        for playerId in playersTemp:
+            playerNow = playersTemp[playerId]
+            for daysBeforeToday in range(1, 4):
+                date = datetime.datetime.today() - datetime.timedelta(days=daysBeforeToday)
+                earlierDateTimestamp = int(time.mktime(date.timetuple()))
+                if earlierDateTimestamp not in playerDataHistory:
+                    print('Not enough player data, remaining days: ' + str(5-daysBeforeToday))
+                    return True
+                playersEarlier = playerDataHistory[earlierDateTimestamp]
+                if playerId not in playerEarlier:
+                    if playerId in players:
+                        del players[playerId]
+                playerEarlier = playersEarlier[playerId]
+                if getPlayerPopulation(playerNow) != getPlayerPopulation(playerEarlier) and playerNow['playerName'] != 'Natars':
+                    if playerId in players:
+                        del players[playerId]
+        realFarms = []
+        for player in players:
+            for village in player['villages']:
+                x = village['x']
+                y = village['y']
+                if x % 100 == 0 and y % 100 == 0:
+                    continue # don't farm ww village
+                realFarms.append({'x': x, 'y': y})
         print('Finished searching for new farms')
         saveDictionaryToJson({'farms': realFarms}, 'farms.json')
         return True
@@ -1485,10 +1523,11 @@ class travian(object):
 
         return html.text
 
-subprocess.check_output("git stash --all", shell=True)
-ret = subprocess.check_output("git pull", shell=True)
-subprocess.check_output("git stash pop", shell=True)
-if str(ret)[2:21] != 'Already up to date.':
-    print('A script is updated, please start again!')
-    exit(1)
+if len(sys.argv) > 1 and sys.argv[1] != 'noupdate':
+    subprocess.check_output("git stash --all", shell=True)
+    ret = subprocess.check_output("git pull", shell=True)
+    subprocess.check_output("git stash pop", shell=True)
+    if str(ret)[2:21] != 'Already up to date.':
+        print('A script is updated, please start again!')
+        exit(1)
 travian()
