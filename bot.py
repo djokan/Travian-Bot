@@ -1523,7 +1523,7 @@ class travian(object):
 
         return html.text
 
-if len(sys.argv) > 1 or sys.argv[1] != 'noupdate':
+if len(sys.argv) < 2 or sys.argv[1] != 'noupdate':
     subprocess.check_output("git stash --all", shell=True)
     ret = subprocess.check_output("git pull", shell=True)
     subprocess.check_output("git stash pop", shell=True)
