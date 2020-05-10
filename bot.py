@@ -353,9 +353,10 @@ class travian(object):
             return False
         playerDataHistory = readDictionaryFromJson('data/playerDataHistory.json')
         if 'data' not in playerDataHistory:
-            playerDataHistory['data'] = {}
-        playerDataHistory = playerDataHistory['data']
-        currentDateTimestamp = int(time.mktime(datetime.datetime.now().date().timetuple()))
+            playerDataHistory = {}
+        else:
+            playerDataHistory = playerDataHistory['data']
+        currentDateTimestamp = str(int(time.mktime(datetime.datetime.now().date().timetuple())))
         if currentDateTimestamp in playerDataHistory:
             return True
         url = self.config["server"] + "map.sql"
@@ -371,7 +372,7 @@ class travian(object):
             playerNow = playersTemp[playerId]
             for daysBeforeToday in range(1, 4):
                 date = datetime.datetime.now().date() - datetime.timedelta(days=daysBeforeToday)
-                earlierDateTimestamp = int(time.mktime(date.timetuple()))
+                earlierDateTimestamp = str(int(time.mktime(date.timetuple())))
                 if earlierDateTimestamp not in playerDataHistory:
                     print('Not enough player data, remaining days: ' + str(5-daysBeforeToday))
                     return True
