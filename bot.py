@@ -377,7 +377,7 @@ class travian(object):
                     print('Not enough player data, remaining days: ' + str(5-daysBeforeToday))
                     return True
                 playersEarlier = playerDataHistory[earlierDateTimestamp]
-                if playerId not in playerEarlier:
+                if playerId not in playersEarlier:
                     if playerId in players:
                         del players[playerId]
                 playerEarlier = playersEarlier[playerId]
