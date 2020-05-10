@@ -429,7 +429,7 @@ class travian(object):
         return None
 
     def readOffensiveReports(self):
-        nextBattlePage = 'berichte.php?t=1'
+        nextBattlePage = 'berichte.php?t=1&opt=AAABAAIAAwA='
         if 'reports' not in self.config:
             self.readReportsFile()
         while True:
