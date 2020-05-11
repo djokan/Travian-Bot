@@ -785,7 +785,8 @@ class travian(object):
                     farm['stolen'] += report['stolen']
                     farm['capacity'] += report['capacity']
 
-    def calculateCoefficientsAndUnalignedPeriods(self, vid, farms, troopType):
+    def calculateCoefficientsAndUnalignedPeriods(self, vid, troopType):
+        farms = self.config['villages'][vid]['farms']
         self.getLastDayStatistics(farms, troopType)
         numberOfChangedPeriods = 0
         for farm in farms:
@@ -816,7 +817,7 @@ class travian(object):
                 if not 'periodPerUnit' in farm:
                     farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
 
-            self.calculateCoefficientsAndUnalignedPeriods(vid, farms, troopType)
+            self.calculateCoefficientsAndUnalignedPeriods(vid, troopType)
             self.alignPeriod(vid, troopType)
             for farm in farms:
                 tempfarm = copy.deepcopy(farm)
@@ -922,12 +923,13 @@ class travian(object):
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
             for farm in self.config['villages'][vid]['farms']:
-                period = self.calculateTroopsToSend(vid, farm, troopType)[troopType] * farm['periodPerUnit'][troopType]
+                troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
+                period = troopsToSend[troopType] * farm['periodPerUnit'][troopType]
                 if 'periodPerUnit' not in farm or period > 12 * 3600:
                     continue
                 attackData = {}
                 attackData['vid'] = vid
-                attackData['troops'] = self.calculateTroopsToSend(vid, farm, troopType)
+                attackData['troops'] = troopsToSend
                 if attackData['troops'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
                     self.removeFarm(farm, vid)
                     continue
