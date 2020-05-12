@@ -49,9 +49,9 @@ def getPlayersDataFromMap(map):
         x = int(villageData[1])
         y = int(villageData[2])
         tribeId = int(villageData[3])
-        villageId = int(villageData[4])
+        villageId = str(villageData[4])
         villageName = villageData[5]
-        playerId = int(villageData[6])
+        playerId = str(villageData[6])
         playerName = villageData[7]
         allianceId = int(villageData[8])
         allianceName = villageData[9]
@@ -367,9 +367,9 @@ class travian(object):
         playerDataHistory[currentDateTimestamp] = players
         saveDictionaryToJson({'data': playerDataHistory}, 'data/playerDataHistory.json')
 
-        playersTemp = copy.deepcopy(players)
-        for playerId in playersTemp:
-            playerNow = playersTemp[playerId]
+        playersToRemove = {}
+        for playerId in players:
+            playerNow = players[playerId]
             for daysBeforeToday in range(1, 4):
                 date = datetime.datetime.now().date() - datetime.timedelta(days=daysBeforeToday)
                 earlierDateTimestamp = str(int(time.mktime(date.timetuple())))
@@ -378,17 +378,18 @@ class travian(object):
                     return True
                 playersEarlier = playerDataHistory[earlierDateTimestamp]
                 if playerId not in playersEarlier:
-                    if playerId in players:
-                        del players[playerId]
-                playerEarlier = playersEarlier[playerId]
-                if getPlayerPopulation(playerNow) != getPlayerPopulation(playerEarlier) and playerNow['playerName'] != 'Natars':
-                    if playerId in players:
-                        del players[playerId]
+                    playersToRemove[playerId] = False
+                else:
+                    playerEarlier = playersEarlier[playerId]
+                    if getPlayerPopulation(playerNow) != getPlayerPopulation(playerEarlier) and playerNow['playerName'] != 'Natars':
+                        playersToRemove[playerId] = True
+        for playerId in playersToRemove:
+            del players[playerId]
         realFarms = []
         for player in players:
-            for village in player['villages']:
-                x = village['x']
-                y = village['y']
+            for village in players[player]['villages']:
+                x = players[player]['villages'][village]['x']
+                y = players[player]['villages'][village]['y']
                 if x % 100 == 0 and y % 100 == 0:
                     continue # don't farm ww village
                 realFarms.append({'x': x, 'y': y})
@@ -923,9 +924,11 @@ class travian(object):
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
             for farm in self.config['villages'][vid]['farms']:
+                if 'periodPerUnit' not in farm:
+                    continue
                 troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
                 period = troopsToSend[troopType] * farm['periodPerUnit'][troopType]
-                if 'periodPerUnit' not in farm or period > 12 * 3600:
+                if period > 12 * 3600:
                     continue
                 attackData = {}
                 attackData['vid'] = vid
