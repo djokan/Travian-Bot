@@ -482,9 +482,11 @@ class travian(object):
         report['destination']['dead'] = []
 
         unknownEnemyTroops = False
-        if len(lastIndexes) > 2 and getRegexValue(troops[lastIndexes[1]],'>([\\d\\?]+)<') == "?":
+        if len(troops) > lastIndexes[1] and getRegexValue(troops[lastIndexes[1]],'>([\\d\\?]+)<') == "?":
             unknownEnemyTroops = True
-            
+        if len(troops) > lastIndexes[2] and getRegexValue(troops[lastIndexes[2]],'>([\\d\\?]+)<') == "?":
+            unknownEnemyTroops = True
+
         if len(lastIndexes) < 4 and unknownEnemyTroops == False:
             return
 
@@ -492,13 +494,16 @@ class travian(object):
             report['source']['sent'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
         for i in range(lastIndexes[0], lastIndexes[1]):
             report['source']['dead'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
+        if 'class="trap"' in html:
+            for i in range(lastIndexes[1], lastIndexes[2]):
+                report['source']['dead'][i - lastIndexes[1]] += int(getRegexValue(troops[i],'>([\\d\\?]+)<'))
         if unknownEnemyTroops:
             report['destination']['sent'] = [5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000, 5000000]
             report['destination']['dead'] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         else:
-            for i in range(lastIndexes[1], lastIndexes[2]):
+            for i in range(lastIndexes[-3], lastIndexes[-2]):
                 report['destination']['sent'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
-            for i in range(lastIndexes[2], lastIndexes[3]):
+            for i in range(lastIndexes[-2], lastIndexes[-1]):
                 report['destination']['dead'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
 
         villages = getRegexValues(html,'karte.php.d=(\\d*)"')
