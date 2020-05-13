@@ -803,7 +803,6 @@ class travian(object):
             if 'stolen' in farm:
                 farm['periodPerUnit'][troopType] /= farm['coefficient']
         self.alignPeriod(vid, troopType, numberOfChangedPeriods)
-        
 
     def calculateFarmPeriods(self, vid):
         farms = self.config['villages'][vid]['farms']
@@ -846,9 +845,9 @@ class travian(object):
             cumulativeTroopsNeeded = cumulativeTroopsNeeded[1:]
             numberOfFarms = len(self.config['villages'][vid]['farms'])
             for i in range(len(self.config['villages'][vid]['farms'])):
-                newperiod = self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType]
-                newperiod *= cumulativeTroopsNeeded[i]/troopCapacity
-                if newperiod > 12* 3600:
+                newPeriodPerUnit = self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType]
+                newPeriodPerUnit *= cumulativeTroopsNeeded[i]/troopCapacity
+                if newPeriodPerUnit * 5 > 12 * 3600:
                     numberOfFarms = i
                     break
         troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
@@ -926,10 +925,10 @@ class travian(object):
             for farm in self.config['villages'][vid]['farms']:
                 if 'periodPerUnit' not in farm:
                     continue
+                if farm['periodPerUnit'][troopType] * 5 > 12 * 3600:
+                    continue
                 troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
                 period = troopsToSend[troopType] * farm['periodPerUnit'][troopType]
-                if period > 12 * 3600:
-                    continue
                 attackData = {}
                 attackData['vid'] = vid
                 attackData['troops'] = troopsToSend
