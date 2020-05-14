@@ -114,6 +114,28 @@ def mulTroop(troops, by):
             break
     return troops
 
+def readRealFarms():
+    realFarms = readDictionaryFromJson('farms.json')
+    if 'farms' not in realFarms:
+        realFarms = []
+    else:
+        realFarms = realFarms['farms']
+    forbiddenFarms = readDictionaryFromJson('forbiddenFarms.json')
+    if 'farms' not in forbiddenFarms:
+        forbiddenFarms = []
+    else:
+        forbiddenFarms = forbiddenFarms['farms']
+
+    realRealFarms = []
+    for farm in realFarms:
+        forbidden = False
+        for forbiddenFarm in forbiddenFarms:
+            if forbiddenFarm['x'] == farm['x'] and forbiddenFarm['y'] == farm['y']:
+                forbidden = True
+        if forbidden == False:
+            realRealFarms.append(farm)
+    return realRealFarms
+
 def readDictionaryFromJson(filepath):
     if not os.path.exists('data'):
         os.makedirs('data')
@@ -414,7 +436,7 @@ class travian(object):
 
     def removeFarm(self, farmToRemove, vid):
         self.config['villages'][vid]['farms'] = [farm for farm in self.config['villages'][vid]['farms'] if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
-        realFarms = readDictionaryFromJson('farms.json')['farms']
+        realFarms = readRealFarms()
         if farmInFarms(farmToRemove, realFarms):
             realFarms = [farm for farm in realFarms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
             saveDictionaryToJson({'farms': realFarms}, 'farms.json')
@@ -1363,7 +1385,8 @@ class travian(object):
         filename = 'farms_' + vid + '.json'
         filepath = 'data/' + filename
         if not path.exists(filepath):
-            shutil.copyfile('farms.json', filepath)
+            realFarms = readRealFarms()
+            saveDictionaryToJson({'farms': realFarms}, filepath)
         self.config['villages'][vid]['farms'] = readDictionaryFromJson(filepath)['farms']
 
         self.removeStaleFarms(vid)
@@ -1391,7 +1414,7 @@ class travian(object):
 
     def removeStaleFarms(self, vid):
         tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
-        realFarms = readDictionaryFromJson('farms.json')['farms']
+        realFarms = readRealFarms()
         for farm in tempfarms:
             if not farmInFarms(farm, realFarms):
                 print('Removing farm: ' + str(farm))
@@ -1402,7 +1425,7 @@ class travian(object):
         
     def addNewFarms(self, vid):
         tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
-        realFarms = readDictionaryFromJson('farms.json')['farms']
+        realFarms = readRealFarms()
         for farm in realFarms:
             if not farmInFarms(farm, tempfarms):
                 print('Adding farm: ' + str(farm))
