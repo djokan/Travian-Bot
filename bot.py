@@ -1526,7 +1526,7 @@ class travian(object):
         vid = getActiveVillageId(html.text)
         if 'class="att1"' in html.text:
             self.doOnceInSeconds(3600 * 8, self.playIncomingAttackSound, 'incomingAttackSound' + vid)
-        if vid:
+        if vid and vid in self.config['villages']:
             data = {}
             if 'dorf1.php' in url:
                 data = self.analysisDorf1(html.text)
