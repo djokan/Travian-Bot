@@ -781,7 +781,7 @@ class travian(object):
             report = self.config['reports'][reportKey]
             if troopTypeOfReport(report) != troopType:
                 continue
-            if report['timestamp'] < time.time() - 20 * 3600: # don't consider older than 20 hours
+            if report['timestamp'] < time.time() - 20 * 3600 or 'stolen' not in report: # don't consider older than 20 hours
                 continue
             for farm in farms:
                 if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
@@ -807,7 +807,7 @@ class travian(object):
         for farm in farms:
             if 'stolen' in farm:
                 farm['periodPerUnit'][troopType] /= farm['coefficient']
-        self.alignPeriod(vid, troopType, numberOfChangedPeriods)
+        self.alignPeriodForFarms(vid, troopType, numberOfChangedPeriods)
 
     def calculateFarmPeriods(self, vid):
         farms = self.config['villages'][vid]['farms']
@@ -838,27 +838,37 @@ class travian(object):
             troopsNeeded += float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType]
         return troopsNeeded
 
-    def alignPeriod(self, vid, troopType, numberOfFarms = -1):
+    def alignPeriodForFarms(self, vid, troopType, numberOfFarms):
         self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['periodPerUnit'][troopType])
         troopCapacity = min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
-        if numberOfFarms < 0:
-            cumulativeTroopsNeeded = [0]
-            for i in range(len(self.config['villages'][vid]['farms'])):
-                farm = self.config['villages'][vid]['farms'][i]
-                lastElem = cumulativeTroopsNeeded[-1]
-                cumulativeTroopsNeeded.append(lastElem + float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType])
-            cumulativeTroopsNeeded = cumulativeTroopsNeeded[1:]
-            numberOfFarms = len(self.config['villages'][vid]['farms'])
-            for i in range(len(self.config['villages'][vid]['farms'])):
-                newPeriodPerUnit = self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType]
-                newPeriodPerUnit *= cumulativeTroopsNeeded[i]/troopCapacity
-                if newPeriodPerUnit * 5 > 12 * 3600:
-                    numberOfFarms = i
-                    break
         troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
         while abs(troopsNeeded/troopCapacity - 1) > 0.01:
             periodAlign = troopsNeeded/troopCapacity
             for i in range(numberOfFarms):
+                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] *= periodAlign
+                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] = int(self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType])
+            troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
+
+    def alignPeriod(self, vid, troopType):
+        self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['periodPerUnit'][troopType])
+        troopCapacity = min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
+        cumulativeTroopsNeeded = [0]
+        for i in range(len(self.config['villages'][vid]['farms'])):
+            farm = self.config['villages'][vid]['farms'][i]
+            lastElem = cumulativeTroopsNeeded[-1]
+            cumulativeTroopsNeeded.append(lastElem + float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType])
+        cumulativeTroopsNeeded = cumulativeTroopsNeeded[1:]
+        numberOfFarms = len(self.config['villages'][vid]['farms'])
+        for i in range(len(self.config['villages'][vid]['farms'])):
+            newPeriodPerUnit = self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType]
+            newPeriodPerUnit *= cumulativeTroopsNeeded[i]/troopCapacity
+            if newPeriodPerUnit * 5 > 12 * 3600:
+                numberOfFarms = i
+                break
+        troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
+        while abs(troopsNeeded/troopCapacity - 1) > 0.01:
+            periodAlign = troopsNeeded/troopCapacity
+            for i in range(len(self.config['villages'][vid]['farms'])):
                 self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] *= periodAlign
                 self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] = int(self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType])
             troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
