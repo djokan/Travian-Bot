@@ -78,7 +78,7 @@ def parseVillageCoordinates(html):
 
 def farmInFarms(farmToSearch, farms):
     for farm in farms:
-        if farmToSearch['x'] == farm['x'] and farmToSearch['y'] == farm['y']:
+        if areCoordinatesEqual(farmToSearch, farm):
             return True
     return False
 
@@ -114,7 +114,7 @@ def mulTroop(troops, by):
             break
     return troops
 
-def readRealFarms():
+def getRealFarms():
     realFarms = readDictionaryFromJson('farms.json')
     if 'farms' not in realFarms:
         realFarms = []
@@ -130,7 +130,7 @@ def readRealFarms():
     for farm in realFarms:
         forbidden = False
         for forbiddenFarm in forbiddenFarms:
-            if forbiddenFarm['x'] == farm['x'] and forbiddenFarm['y'] == farm['y']:
+            if areCoordinatesEqual(forbiddenFarm, farm):
                 forbidden = True
         if forbidden == False:
             realRealFarms.append(farm)
@@ -151,6 +151,9 @@ def saveDictionaryToJson(dict, filepath):
         os.makedirs('data')
     with open(filepath, 'w') as file:
         json.dump(dict, file)
+
+def areCoordinatesEqual(farm1, farm2):
+    return farm1['x'] == farm2['x'] and farm1['y'] == farm2['y']
 
 def parseConstructionFinishTimes(html):
     parser = BeautifulSoup(html, "html5lib")
@@ -338,8 +341,8 @@ class travian(object):
         self.config['villages']["1"]['y'] = 10
         self.config['villages']["1"]['troopCapacity'] = [5, 0, 0, 0, 5, 0, 0, 0, 0, 0]
         self.config['villages']["1"]['farms'] = [{"x": 10, "y": 16, "periodPerUnit": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 16, "y": 10, "periodPerUnit": [3600, 0, 0, 0, 3600, 0, 0, 0, 0, 0]}, {"x": 500, "y": 500, "periodPerUnit": [10000, 0, 0, 0, 10000, 0, 0, 0, 0, 0]}]
-        self.alignPeriod("1", 0)
-        self.alignPeriod("1", 4)
+        self.alignPeriods("1", 0)
+        self.alignPeriods("1", 4)
         self.config['villages']["1"]['farms'][2]["periodPerUnit"] = [150000, 0, 0, 0, 150000, 0, 0, 0, 0, 0]
         print(self.config['villages']["1"]['farms'])
         self.calculateFarmPeriods("1")
@@ -437,14 +440,16 @@ class travian(object):
         time.sleep(2)
 
     def removeFarm(self, farmToRemove, vid):
-        self.config['villages'][vid]['farms'] = [farm for farm in self.config['villages'][vid]['farms'] if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
-        realFarms = readRealFarms()
+        farms = self.getVillageFarms(vid)
+        farms = [farm for farm in farms if not areCoordinatesEqual(farmToRemove, farm)]
+        self.saveVillageFarms(vid, farms)
+        realFarms = getRealFarms()
         if farmInFarms(farmToRemove, realFarms):
-            realFarms = [farm for farm in realFarms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
+            realFarms = [farm for farm in realFarms if not areCoordinatesEqual(farmToRemove, farm)]
             saveDictionaryToJson({'farms': realFarms}, 'farms.json')
 
     def getAttackableFarms(self, vid, troopType):
-        attackableFarms = [farm for farm in self.config['villages'][vid]['farms'] if 'periodPerUnit' in farm]
+        attackableFarms = [farm for farm in self.getVillageFarms(vid) if 'periodPerUnit' in farm]
         attackableFarms = [farm for farm in attackableFarms if farm['periodPerUnit'][troopType] * 5 <= 12*3600]
         return [farm for farm in attackableFarms if self.existsInTemporarilyRemovedFarms(farm) == False]
 
@@ -456,7 +461,7 @@ class travian(object):
             removedFarms = removedFarms['farms']
         updated = False
         for farm in removedFarms:
-            if farm['x'] == farmToRemove['x'] and farm['y'] == farmToRemove['y']:
+            if areCoordinatesEqual(farm, farmToRemove):
                 updated = True
                 farm['until'] = time.time() + 24*3600
                 break
@@ -475,7 +480,7 @@ class travian(object):
             return False
         removedFarms = removedFarms['farms']
         for farm in removedFarms:
-            if farm['x'] == farmToCheck['x'] and farm['y'] == farmToCheck['y']:
+            if areCoordinatesEqual(farm, farmToCheck):
                 return True
         return False
 
@@ -493,7 +498,7 @@ class travian(object):
         for farm in removedFarms:
             removed = False
             for farm2 in toRemove:
-                if farm['x'] == farm2['x'] and farm['y'] == farm2['y']:
+                if areCoordinatesEqual(farm, farm2):
                     removed = True
             if removed == False:
                 retFarms.append(farm)
@@ -502,12 +507,12 @@ class travian(object):
 
     def doOnceInSeconds(self, delay, function, function_name, *args):
         if not function_name in self.doneTasks or self.doneTasks[function_name] < time.time():
-            if function(*args) == True:
+            if function(*args) == False:
+                return False
+            else:
                 self.doneTasks[function_name] = time.time() + delay
                 saveDictionaryToJson(self.doneTasks, 'data/doOnceInSeconds.json')
                 return True
-            else:
-                return False
         return None
 
     def readOffensiveReports(self):
@@ -855,10 +860,52 @@ class travian(object):
         farmY = farm['y']
         return int(math.sqrt((vidX-farmX)**2 + (vidY-farmY)**2)*2*3600/troopSpeed[self.config['tribe']][troopType])
 
-    def initFarmPeriods(self, vid, farm):
+    def getGlobalPeriodMultiply(self, vid):
+        filename = 'GlobalPeriodMultiply' + vid + '.json'
+        filepath = 'data/' + filename
+        retFile = readDictionaryFromJson(filepath)
+        if 'globalPeriodMultiply' not in retFile:
+            self.calculateGlobalPeriodMultiply(vid)
+            retFile = readDictionaryFromJson(filepath)
+        return retFile['globalPeriodMultiply']
+
+    def multiplyGlobalPeriodMultiply(self, vid, troopType, value):
+        filename = 'GlobalPeriodMultiply' + vid + '.json'
+        filepath = 'data/' + filename
+        retFile = readDictionaryFromJson(filepath)
+        if 'globalPeriodMultiply' not in retFile:
+            self.calculateGlobalPeriodMultiply(vid)
+            retFile = readDictionaryFromJson(filepath)
+        retFile['globalPeriodMultiply'][troopType] *= value
+        saveDictionaryToJson(retFile, filepath)
+
+    def calculateGlobalPeriodMultiply(self, vid):
+        filename = 'GlobalPeriodMultiply' + vid + '.json'
+        filepath = 'data/' + filename
+        retFile = readDictionaryFromJson(filepath)
+        farms = self.getVillageFarms(vid)
+        periodMultiply = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        for farm in farms:
+            for reportKey in self.config['reports']:
+                report = self.config['reports'][reportKey]
+                if areCoordinatesEqual(report['destination'], farm):
+                    continue
+            if 'periodPerUnit' not in farm:
+                continue
+            initPeriods = self.initFarmPeriods(vid, farm, False)
+            for i in range(10):
+                periodMultiply[i] = farm['periodPerUnit'][i] / initPeriods[i]
+            break
+        retFile['globalPeriodMultiply'] = periodMultiply
+        saveDictionaryToJson(retFile, filepath)
+
+    def initFarmPeriods(self, vid, farm, withGlobalPeriodMultiply = True):
+        globalPeriodMultiply = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        if withGlobalPeriodMultiply:
+            globalPeriodMultiply = self.getGlobalPeriodMultiply(vid)
         periods = []
         for troopType in range(10):
-            periods.append(int(self.travelTime(vid, farm, troopType) / initialTroopsForFarming[troopType][troopType]))
+            periods.append(int(globalPeriodMultiply[troopType] * self.travelTime(vid, farm, troopType) / initialTroopsForFarming[troopType][troopType]))
         return periods
 
     def getLastDayStatistics(self, farms, troopType):
@@ -869,7 +916,7 @@ class travian(object):
             if report['timestamp'] < time.time() - 20 * 3600 or 'stolen' not in report: # don't consider older than 20 hours
                 continue
             for farm in farms:
-                if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+                if areCoordinatesEqual(farm, report['destination']):
                     if 'stolen' not in farm:
                         farm['stolen'] = 0
                         farm['capacity'] = 0
@@ -877,7 +924,7 @@ class travian(object):
                     farm['capacity'] += report['capacity']
 
     def calculatePeriodsFromReports(self, vid, troopType):
-        farms = self.config['villages'][vid]['farms']
+        farms = self.getVillageFarms(vid)
         self.getLastDayStatistics(farms, troopType)
         for farm in farms:
             if 'stolen' in farm:
@@ -888,42 +935,47 @@ class travian(object):
                 farm['coefficient'] *= 2
 
         farmsToChange = [farm for farm in farms if 'coefficient' in farm]
+        troopsNeeded = 1
         troopsToUse =  self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
         for farm in farmsToChange:
             farm['periodPerUnit'][troopType] /= farm['coefficient']
-        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
-        periodAlign = troopsNeeded/troopsToUse
-        for farm in farmsToChange:
-            farm['periodPerUnit'][troopType] *= periodAlign
-            farm['periodPerUnit'][troopType] = int(farm['periodPerUnit'][troopType])
-        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+        for i in range(10):
+            troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+            periodAlign = troopsNeeded/troopsToUse
+            for farm in farmsToChange:
+                farm['periodPerUnit'][troopType] *= periodAlign
+            troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+            print(troopsNeeded)
+            if abs(troopsNeeded/troopsToUse - 1) < 0.01:
+                break
         if abs(troopsNeeded/troopsToUse - 1) > 0.01:
             print('unaligned period calculation is wrong!')
             print(troopsNeeded)
             print(troopsToUse)
             exit(1)
-        
-        for farm in self.config['villages'][vid]['farms']:
+
+        for farm in self.getVillageFarms(vid):
             tempfarm = copy.deepcopy(farm)
             for key in tempfarm:
                 if key != 'x' and key != 'y' and key != 'periodPerUnit':
                     del farm[key]
+        self.saveVillageFarms(vid, farms)
 
     def calculateFarmPeriods(self, vid):
-        farms = self.config['villages'][vid]['farms']
+        farms = self.getVillageFarms(vid)
         print('Calculating farm periods for village: ' + vid)
+        for farm in farms:
+            if not 'periodPerUnit' in farm:
+                farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
                 troopTypes.append(i)
         for troopType in troopTypes:
             print('Calculating farm periods for troop type: ' + str(troopType))
-            for farm in farms:
-                if not 'periodPerUnit' in farm:
-                    farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
 
             self.calculatePeriodsFromReports(vid, troopType)
-            self.alignPeriod(vid, troopType)
+            self.alignPeriods(vid, troopType)
         return True
 
     def getFarmingTroopCapacity(self, vid, troopType):
@@ -935,7 +987,7 @@ class travian(object):
             troopsNeeded += float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType]
         return troopsNeeded
 
-    def alignPeriod(self, vid, troopType): # binary search to align troopsNeeded to be equal to troopCapacity
+    def alignPeriods(self, vid, troopType): # binary search to align troopsNeeded to be equal to troopCapacity
         upperBoundMultiply = 1
         currentMultiply = 1
         lowerBoundMultiply = 1
@@ -978,13 +1030,14 @@ class travian(object):
         attackableFarms = self.getAttackableFarms(vid, troopType)
         troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
         troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
+        self.debugLog('Periods multiplied by ' + str(nextMultiply))
 
     def calculateTroopsToSend(self, vid, farm, troopType):
         minimalFighthingStrength = 1
         maximalFighthingStrength = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
-            if farm['x'] == report['destination']['x'] and farm['y'] == report['destination']['y']:
+            if areCoordinatesEqual(farm, report['destination']):
                 if troopTypeOfReport(report) == troopType:    
                     if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
                         minimalFighthingStrength = max(minimalFighthingStrength, self.getFighthingStrength(report['source']['sent'])+1)
@@ -1035,13 +1088,15 @@ class travian(object):
         return troops
 
     def multiplyAllPeriods(self, vid, troopType, value):
-        for farm in self.config['villages'][vid]['farms']:
+        self.multiplyGlobalPeriodMultiply(vid, troopType, value)
+        farms = self.getVillageFarms(vid)
+        for farm in farms:
             if 'periodPerUnit' not in farm:
                 farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
             farm['periodPerUnit'][troopType] *= value
+        self.saveVillageFarms(vid, farms)
 
     def farm(self, vid):
-        self.readFarmsFile(vid)
         self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid)
         self.enableOldTemporarilyRemovedFarms()
         troopTypes = []
@@ -1050,7 +1105,7 @@ class travian(object):
                 troopTypes.append(i)
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
-            self.doOnceInSeconds(3600, self.alignPeriod, 'alignPeriodPeriodically[' + vid + '][' + str(troopType) + ']', vid, troopType)
+            self.doOnceInSeconds(3600, self.alignPeriods, 'alignPeriodsPeriodically[' + vid + '][' + str(troopType) + ']', vid, troopType)
             attackableFarms = self.getAttackableFarms(vid, troopType)
             for farm in attackableFarms:
                 troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
@@ -1069,7 +1124,6 @@ class travian(object):
                 if isSuccessful == False:
                     if not self.doesHaveEnoughTroops(vid, attackData['troops']):
                         break
-        self.saveFarmsFile(vid)
 
     def resourceFieldLevelsSum(self, vid):
 
@@ -1454,7 +1508,7 @@ class travian(object):
 
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
-            if report['source']['x'] != self.config['villages'][vid]['x'] or report['source']['y'] != self.config['villages'][vid]['y']:
+            if not areCoordinatesEqual(report['source'], self.config['villages'][vid]):
                 continue
             troopType = troopTypeOfReport(report)
             oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
@@ -1480,17 +1534,6 @@ class travian(object):
         logs['logs'].append({'log': log, 'timestamp': time.time()})
         saveDictionaryToJson(logs, 'data/debugLogs.json')
 
-    def readFarmsFile(self, vid):
-        filename = 'farms_' + vid + '.json'
-        filepath = 'data/' + filename
-        if not path.exists(filepath):
-            realFarms = readRealFarms()
-            saveDictionaryToJson({'farms': realFarms}, filepath)
-        self.config['villages'][vid]['farms'] = readDictionaryFromJson(filepath)['farms']
-
-        self.removeStaleFarms(vid)
-        self.addNewFarms(vid)
-
     def saveToSentTroopsLog(self, attackData):
         filepath = 'data/sentAttacksLog.json'
         sentAttacks = readDictionaryFromJson(filepath)
@@ -1511,32 +1554,46 @@ class travian(object):
         sentAttacks['sent'] = [attack for attack in sentAttacks['sent'] if attack['timestamp'] > int(time.time()) - 24*3600]
         saveDictionaryToJson(sentAttacks, filepath)
 
+    def getVillageFarms(self, vid, readOnly=False):
+        if readOnly == False:
+            self.doOnceInSeconds(10, self.removeStaleFarms, 'removeStaleFarms[' + vid + ']', vid)
+            self.doOnceInSeconds(10, self.addNewFarms, 'addNewFarms[' + vid + ']', vid)
+        filename = 'farms_' + vid + '.json'
+        filepath = 'data/' + filename
+        if not path.exists(filepath):
+            realFarms = getRealFarms()
+            saveDictionaryToJson({'farms': realFarms}, filepath)
+        farmsFile = readDictionaryFromJson(filepath)
+        return farmsFile['farms']
+
+    def saveVillageFarms(self, vid, farms):
+        filename = 'farms_' + vid + '.json'
+        filepath = 'data/' + filename
+        farmsFile = readDictionaryFromJson(filepath)
+        farmsFile['farms'] = farms
+        saveDictionaryToJson(farmsFile, filepath)
+
     def removeStaleFarms(self, vid):
-        tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
-        realFarms = readRealFarms()
-        for farm in tempfarms:
+        farms = self.getVillageFarms(vid, True)
+        realFarms = getRealFarms()
+        for farm in farms:
             if not farmInFarms(farm, realFarms):
                 print('Removing farm: ' + str(farm))
                 self.removeFarm(farm, vid)
 
-                if farmInFarms(farm, self.config['villages'][vid]['farms']):
+                if farmInFarms(farm, self.getVillageFarms(vid, True)):
                     exit(1)
-        
+
     def addNewFarms(self, vid):
-        tempfarms = copy.deepcopy(self.config['villages'][vid]['farms'])
-        realFarms = readRealFarms()
+        farms = self.getVillageFarms(vid, True)
+        realFarms = getRealFarms()
         for farm in realFarms:
-            if not farmInFarms(farm, tempfarms):
+            if not farmInFarms(farm, farms):
                 print('Adding farm: ' + str(farm))
                 newFarm = copy.deepcopy(farm)
                 newFarm['periodPerUnit'] = self.initFarmPeriods(vid, newFarm)
-                self.config['villages'][vid]['farms'].append(newFarm)
-
-                if not farmInFarms(farm, self.config['villages'][vid]['farms']):
-                    exit(1)
-
-    def saveFarmsFile(self, vid):
-        saveDictionaryToJson({'farms': self.config['villages'][vid]['farms']}, 'data/farms_' + vid + '.json')
+                farms.append(newFarm)
+        self.saveVillageFarms(vid, farms)
 
     def readReportsFile(self):
         self.config['reports'] = readDictionaryFromJson('data/reports.json')
