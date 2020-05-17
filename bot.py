@@ -954,7 +954,7 @@ class travian(object):
             print(troopsToUse)
             exit(1)
 
-        for farm in self.getVillageFarms(vid):
+        for farm in farms:
             tempfarm = copy.deepcopy(farm)
             for key in tempfarm:
                 if key != 'x' and key != 'y' and key != 'periodPerUnit':
