@@ -18,9 +18,9 @@ import os.path
 from os import path
 WAREHOUSECOEFF = 0.8
 troopSpeed = {}
-troopSpeed["Roman"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
-troopSpeed["Gaul"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
-troopSpeed["Teuton"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5]
+troopSpeed["Roman"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5, 20]
+troopSpeed["Gaul"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5, 20]
+troopSpeed["Teuton"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5, 20]
 
 troopStrength = {}
 troopStrength["Roman"] = [40, 30, 70, 0, 120, 180, 60, 75, 50, 0, 1500]
@@ -275,10 +275,12 @@ class travian(object):
         self.getConfig(True) # shutdown if error
         self.proxies = dict(http='socks5://127.0.0.1:9050', https='socks5://127.0.0.1:9050')
         self.session = requests.Session()
-        self.startingTimestamp = time.time()
         self.loggedIn=False
         self.doneTasks = readDictionaryFromJson('data/doOnceInSeconds.json')
         self.adventureExists = False
+
+    def start(self):
+        self.startingTimestamp = time.time()
         self.login()
         while 1:
             self.getConfig(False) # don't shutdown if error
@@ -357,14 +359,14 @@ class travian(object):
             print('travelTime1 failed')
             print(self.travelTime("1", self.config['villages']["1"]['farms'][0], 0))
             return False
-        troopsNeeded = self.calculateTroopsNeeded("1", 0, 2)
+        troopsNeeded = self.calculateFarmingTroopsNeeded("1", 0, 2)
         if troopsNeeded > 6 or troopsNeeded < 4:
-            print('calculateTroopsNeeded1 failed')
+            print('calculateFarmingTroopsNeeded1 failed')
             print(troopsNeeded)
             return False
-        troopsNeeded = self.calculateTroopsNeeded("1", 4, 2)
+        troopsNeeded = self.calculateFarmingTroopsNeeded("1", 4, 2)
         if troopsNeeded > 6 or troopsNeeded < 4:
-            print('calculateTroopsNeeded2 failed')
+            print('calculateFarmingTroopsNeeded2 failed')
             print(troopsNeeded)
             return False
         print(self.config['villages']["1"]['farms'])
@@ -440,6 +442,63 @@ class travian(object):
         if farmInFarms(farmToRemove, realFarms):
             realFarms = [farm for farm in realFarms if farmToRemove['x'] != farm['x'] or farmToRemove['y'] != farm['y']]
             saveDictionaryToJson({'farms': realFarms}, 'farms.json')
+
+    def getAttackableFarms(self, vid, troopType):
+        attackableFarms = [farm for farm in self.config['villages'][vid]['farms'] if 'periodPerUnit' in farm]
+        attackableFarms = [farm for farm in attackableFarms if farm['periodPerUnit'][troopType] * 5 <= 12*3600]
+        return [farm for farm in attackableFarms if self.existsInTemporarilyRemovedFarms(farm) == False]
+
+    def removeFarmTemporarily(self, farmToRemove):
+        removedFarms = readDictionaryFromJson('data/tempRemovedFarms.json')
+        if 'farms' not in removedFarms:
+            removedFarms = []
+        else:
+            removedFarms = removedFarms['farms']
+        updated = False
+        for farm in removedFarms:
+            if farm['x'] == farmToRemove['x'] and farm['y'] == farmToRemove['y']:
+                updated = True
+                farm['until'] = time.time() + 24*3600
+                break
+        if updated == False:
+            newFarm = copy.deepcopy(farmToRemove)
+            newFarm['until'] = time.time() + 24*3600
+            for key in newFarm:
+                if key != 'x' and key != 'y' and key != 'until':
+                    del newFarm[key]
+            removedFarms.append(newFarm)
+        saveDictionaryToJson({ "farms" : removedFarms }, 'data/tempRemovedFarms.json')
+    
+    def existsInTemporarilyRemovedFarms(self, farmToCheck):
+        removedFarms = readDictionaryFromJson('data/tempRemovedFarms.json')
+        if 'farms' not in removedFarms:
+            return False
+        removedFarms = removedFarms['farms']
+        for farm in removedFarms:
+            if farm['x'] == farmToCheck['x'] and farm['y'] == farmToCheck['y']:
+                return True
+        return False
+
+    def enableOldTemporarilyRemovedFarms(self):
+        removedFarms = readDictionaryFromJson('data/tempRemovedFarms.json')
+        if 'farms' not in removedFarms:
+            removedFarms = []
+        else:
+            removedFarms = removedFarms['farms']
+        toRemove = []
+        for farm in removedFarms:
+            if farm['until'] < time.time():
+                toRemove.append(farm)
+        retFarms = []
+        for farm in removedFarms:
+            removed = False
+            for farm2 in toRemove:
+                if farm['x'] == farm2['x'] and farm['y'] == farm2['y']:
+                    removed = True
+            if removed == False:
+                retFarms.append(farm)
+        
+        saveDictionaryToJson({ "farms" : retFarms }, 'data/tempRemovedFarms.json')
 
     def doOnceInSeconds(self, delay, function, function_name, *args):
         if not function_name in self.doneTasks or self.doneTasks[function_name] < time.time():
@@ -790,7 +849,11 @@ class travian(object):
         return True
 
     def travelTime(self, vid, farm, troopType):
-        return int(math.sqrt((self.config['villages'][vid]['x']-farm['x'])**2 + (self.config['villages'][vid]['y']-farm['y'])**2)*2*3600/troopSpeed[self.config['tribe']][troopType])
+        vidX = self.config['villages'][vid]['x']
+        farmX = farm['x']
+        vidY = self.config['villages'][vid]['y']
+        farmY = farm['y']
+        return int(math.sqrt((vidX-farmX)**2 + (vidY-farmY)**2)*2*3600/troopSpeed[self.config['tribe']][troopType])
 
     def initFarmPeriods(self, vid, farm):
         periods = []
@@ -813,23 +876,38 @@ class travian(object):
                     farm['stolen'] += report['stolen']
                     farm['capacity'] += report['capacity']
 
-    def calculateCoefficientsAndUnalignedPeriods(self, vid, troopType):
+    def calculatePeriodsFromReports(self, vid, troopType):
         farms = self.config['villages'][vid]['farms']
         self.getLastDayStatistics(farms, troopType)
-        numberOfChangedPeriods = 0
         for farm in farms:
             if 'stolen' in farm:
                 averageStealPercent = 40 * farm['stolen'] / farm['capacity'] + 80 # we want periods to slowly change
-                # we want coefficients bigger than 1 because self.alignPeriod will change lowest periods
-                farm['coefficient'] = 1000000 * averageStealPercent / self.travelTime(vid, farm, troopType)
-                numberOfChangedPeriods += 1
+                farm['coefficient'] = averageStealPercent / self.travelTime(vid, farm, troopType)
         for farm in farms:
-            if 'stolen' in farm and farm['stolen']/farm['capacity'] > 0.95:
+            if 'coefficient' in farm and farm['stolen']/farm['capacity'] > 0.95:
                 farm['coefficient'] *= 2
-        for farm in farms:
-            if 'stolen' in farm:
-                farm['periodPerUnit'][troopType] /= farm['coefficient']
-        self.alignPeriodForFarms(vid, troopType, numberOfChangedPeriods)
+
+        farmsToChange = [farm for farm in farms if 'coefficient' in farm]
+        troopsToUse =  self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+        for farm in farmsToChange:
+            farm['periodPerUnit'][troopType] /= farm['coefficient']
+        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+        periodAlign = troopsNeeded/troopsToUse
+        for farm in farmsToChange:
+            farm['periodPerUnit'][troopType] *= periodAlign
+            farm['periodPerUnit'][troopType] = int(farm['periodPerUnit'][troopType])
+        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
+        if abs(troopsNeeded/troopsToUse - 1) > 0.01:
+            print('unaligned period calculation is wrong!')
+            print(troopsNeeded)
+            print(troopsToUse)
+            exit(1)
+        
+        for farm in self.config['villages'][vid]['farms']:
+            tempfarm = copy.deepcopy(farm)
+            for key in tempfarm:
+                if key != 'x' and key != 'y' and key != 'periodPerUnit':
+                    del farm[key]
 
     def calculateFarmPeriods(self, vid):
         farms = self.config['villages'][vid]['farms']
@@ -844,56 +922,62 @@ class travian(object):
                 if not 'periodPerUnit' in farm:
                     farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
 
-            self.calculateCoefficientsAndUnalignedPeriods(vid, troopType)
+            self.calculatePeriodsFromReports(vid, troopType)
             self.alignPeriod(vid, troopType)
-            for farm in farms:
-                tempfarm = copy.deepcopy(farm)
-                for key in tempfarm:
-                    if key != 'x' and key != 'y' and key != 'periodPerUnit':
-                        del farm[key]
         return True
 
-    def calculateTroopsNeeded(self, vid, troopType, numberOfFarms):
+    def getFarmingTroopCapacity(self, vid, troopType):
+        return min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
+
+    def calculateFarmingTroopsNeeded(self, vid, farms, troopType):
         troopsNeeded = 0.0
-        for i in range(numberOfFarms):
-            farm = self.config['villages'][vid]['farms'][i]
+        for farm in farms:
             troopsNeeded += float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType]
         return troopsNeeded
 
-    def alignPeriodForFarms(self, vid, troopType, numberOfFarms):
-        self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['periodPerUnit'][troopType])
-        troopCapacity = min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
-        troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
-        while abs(troopsNeeded/troopCapacity - 1) > 0.01:
-            periodAlign = troopsNeeded/troopCapacity
-            for i in range(numberOfFarms):
-                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] *= periodAlign
-                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] = int(self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType])
-            troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
-
-    def alignPeriod(self, vid, troopType):
-        self.config['villages'][vid]['farms'] = sorted(self.config['villages'][vid]['farms'], key = lambda i: i['periodPerUnit'][troopType])
-        troopCapacity = min(self.config['villages'][vid]['troopCapacity'][troopType], self.getNumberOfTroops(vid, troopType))
-        cumulativeTroopsNeeded = [0]
-        for i in range(len(self.config['villages'][vid]['farms'])):
-            farm = self.config['villages'][vid]['farms'][i]
-            lastElem = cumulativeTroopsNeeded[-1]
-            cumulativeTroopsNeeded.append(lastElem + float(self.travelTime(vid, farm, troopType)) / farm['periodPerUnit'][troopType])
-        cumulativeTroopsNeeded = cumulativeTroopsNeeded[1:]
-        numberOfFarms = len(self.config['villages'][vid]['farms'])
-        for i in range(len(self.config['villages'][vid]['farms'])):
-            newPeriodPerUnit = self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType]
-            newPeriodPerUnit *= cumulativeTroopsNeeded[i]/troopCapacity
-            if newPeriodPerUnit * 5 > 12 * 3600:
-                numberOfFarms = i
-                break
-        troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
-        while abs(troopsNeeded/troopCapacity - 1) > 0.01:
-            periodAlign = troopsNeeded/troopCapacity
-            for i in range(len(self.config['villages'][vid]['farms'])):
-                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] *= periodAlign
-                self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType] = int(self.config['villages'][vid]['farms'][i]['periodPerUnit'][troopType])
-            troopsNeeded = self.calculateTroopsNeeded(vid, troopType, numberOfFarms)
+    def alignPeriod(self, vid, troopType): # binary search to align troopsNeeded to be equal to troopCapacity
+        upperBoundMultiply = 1
+        currentMultiply = 1
+        lowerBoundMultiply = 1
+        attackableFarms = self.getAttackableFarms(vid, troopType)
+        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
+        troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
+        if troopsNeeded < troopCapacity:
+            while troopsNeeded < troopCapacity:
+                self.multiplyAllPeriods(vid, troopType, 0.5)
+                attackableFarms = self.getAttackableFarms(vid, troopType)
+                troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
+                troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
+                currentMultiply *= 0.5
+                lowerBoundMultiply = currentMultiply
+            upperBoundMultiply = lowerBoundMultiply * 2
+        else:
+            while troopsNeeded > troopCapacity:
+                self.multiplyAllPeriods(vid, troopType, 2)
+                attackableFarms = self.getAttackableFarms(vid, troopType)
+                troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
+                troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
+                currentMultiply *= 2
+                upperBoundMultiply = currentMultiply
+            lowerBoundMultiply = upperBoundMultiply * 0.5
+        for i in range(50):
+            nextMultiply = (upperBoundMultiply + lowerBoundMultiply) / 2
+            periodAlign = nextMultiply / currentMultiply
+            currentMultiply = nextMultiply
+            self.multiplyAllPeriods(vid, troopType, periodAlign)
+            attackableFarms = self.getAttackableFarms(vid, troopType)
+            troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
+            troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
+            if troopsNeeded < troopCapacity:
+                upperBoundMultiply = currentMultiply
+            else:
+                lowerBoundMultiply = currentMultiply
+        nextMultiply = lowerBoundMultiply
+        periodAlign = nextMultiply / currentMultiply
+        self.multiplyAllPeriods(vid, troopType, periodAlign) # we want troopsNeeded to be bigger than troopCapacity
+        attackableFarms = self.getAttackableFarms(vid, troopType)
+        troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
+        troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
 
     def calculateTroopsToSend(self, vid, farm, troopType):
         minimalFighthingStrength = 1
@@ -950,20 +1034,25 @@ class travian(object):
             addTroop(troops, 1)
         return troops
 
+    def multiplyAllPeriods(self, vid, troopType, value):
+        for farm in self.config['villages'][vid]['farms']:
+            if 'periodPerUnit' not in farm:
+                farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
+            farm['periodPerUnit'][troopType] *= value
+
     def farm(self, vid):
         self.readFarmsFile(vid)
         self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid)
+        self.enableOldTemporarilyRemovedFarms()
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
                 troopTypes.append(i)
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
-            for farm in self.config['villages'][vid]['farms']:
-                if 'periodPerUnit' not in farm:
-                    continue
-                if farm['periodPerUnit'][troopType] * 5 > 12 * 3600:
-                    continue
+            self.doOnceInSeconds(3600, self.alignPeriod, 'alignPeriodPeriodically[' + vid + '][' + str(troopType) + ']', vid, troopType)
+            attackableFarms = self.getAttackableFarms(vid, troopType)
+            for farm in attackableFarms:
                 troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
                 period = troopsToSend[troopType] * farm['periodPerUnit'][troopType]
                 attackData = {}
@@ -1249,7 +1338,8 @@ class travian(object):
         data = mergeDict(data, getAttackData2(html))
         data['a'] = getRegexValue(html, 'value="([^"]*)" name="a" id="btn_ok"')
         if 'class="error"' in html:
-            return True
+            self.removeFarmTemporarily({'x': attackData['x'], 'y': attackData['y']})
+            return False
         for key in data:
             if data[key] == None:
                 print(html)
@@ -1344,35 +1434,44 @@ class travian(object):
         data['constructionFinishTimes'] = parseConstructionFinishTimes(html)
         return data
 
-    def getNumberOfTroops(self, vid, troopType):
+    def calculateNumberOfTroops(self, vid):
         self.sendHTTPRequest(self.config['server'] + 'dorf1.php?newdid=' + vid + '&')
         self.sendHTTPRequest(self.config['server'] + 'build.php?tt=2&id=39')
-        currentTroops = self.config['villages'][vid]['availableTroops'][troopType]
+        currentTroops = self.config['villages'][vid]['availableTroops']
+        numberOfTroopTypes = 10
         sentAttacks = readDictionaryFromJson('data/sentAttacksLog.json')
         if 'sent' in sentAttacks:
             for attack in sentAttacks['sent']:
                 if vid != attack['attackData']['vid']:
                     continue
-                if troopTypeOfTroops(attack['attackData']['troops']) != troopType:
-                    continue
+                troopType = troopTypeOfTroops(attack['attackData']['troops'])
                 travelTime = self.travelTime(vid, {'x': attack['attackData']['x'], 'y': attack['attackData']['y']}, troopType)
                 oneWayTravelTime = int(travelTime / 2)
                 if time.time() > attack['timestamp'] + oneWayTravelTime:
                     continue
-                currentTroops += attack['attackData']['troops'][troopType]
-        
+                for i in range(numberOfTroopTypes):
+                    currentTroops[i] += attack['attackData']['troops'][i]
+
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
             if report['source']['x'] != self.config['villages'][vid]['x'] or report['source']['y'] != self.config['villages'][vid]['y']:
                 continue
-            if troopTypeOfReport(report) != troopType:
-                continue
+            troopType = troopTypeOfReport(report)
             oneWayTravelTime = self.travelTime(vid, {'x': report['destination']['x'], 'y': report['destination']['y']}, troopType) / 2
             if time.time() > report['timestamp'] + oneWayTravelTime:
                 continue
-            currentTroops += report['source']['sent'][troopType] - report['source']['dead'][troopType]
-        self.debugLog('getNumberOfTroops vid=' + vid + ' troopType=' + str(troopType) + ' = ' + str(currentTroops))
-        return currentTroops
+            for i in range(numberOfTroopTypes):
+                currentTroops[i] += report['source']['sent'][i] - report['source']['dead'][i]
+        self.debugLog('calculateNumberOfTroops[' + vid + '] = ' + str(currentTroops))
+        self.config['villages'][vid]['numberOfTroops'] = currentTroops
+        return True
+
+    def getNumberOfTroops(self, vid, troopType):
+        if 'numberOfTroops' not in self.config['villages'][vid]:
+            self.calculateNumberOfTroops(vid)
+        else:
+            self.doOnceInSeconds(60, self.calculateNumberOfTroops, "calculateNumberOfTroops[" + vid + "]", vid)
+        return self.config['villages'][vid]['numberOfTroops'][troopType]
 
     def debugLog(self, log):
         logs = readDictionaryFromJson('data/debugLogs.json')
@@ -1429,7 +1528,9 @@ class travian(object):
         for farm in realFarms:
             if not farmInFarms(farm, tempfarms):
                 print('Adding farm: ' + str(farm))
-                self.config['villages'][vid]['farms'].append(farm)
+                newFarm = copy.deepcopy(farm)
+                newFarm['periodPerUnit'] = self.initFarmPeriods(vid, newFarm)
+                self.config['villages'][vid]['farms'].append(newFarm)
 
                 if not farmInFarms(farm, self.config['villages'][vid]['farms']):
                     exit(1)
@@ -1564,12 +1665,12 @@ class travian(object):
             self.config['villages'][vid] = mergeDict(self.config['villages'][vid], data)         
 
         return html.text
-
-if len(sys.argv) < 2 or sys.argv[1] != 'noupdate':
-    subprocess.check_output("git stash --all", shell=True)
-    ret = subprocess.check_output("git pull", shell=True)
-    subprocess.check_output("git stash pop", shell=True)
-    if str(ret)[2:21] != 'Already up to date.':
-        print('A script is updated, please start again!')
-        exit(1)
-travian()
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] != 'noupdate':
+        subprocess.check_output("git stash --all", shell=True)
+        ret = subprocess.check_output("git pull", shell=True)
+        subprocess.check_output("git stash pop", shell=True)
+        if str(ret)[2:21] != 'Already up to date.':
+            print('A script is updated, please start again!')
+            exit(1)
+    travian().start()
