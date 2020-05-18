@@ -593,9 +593,10 @@ class travian(object):
                 report['destination']['dead'].append(int(getRegexValue(troops[i],'>([\\d\\?]+)<')))
 
         villages = getRegexValues(html,'karte.php.d=(\\d*)"')
-
-        report['source'] = mergeDict(report['source'], getVillageCoordinatesFromD(int(villages[0])))
-        report['destination'] = mergeDict(report['destination'], getVillageCoordinatesFromD(int(villages[1])))
+        if len(villages) > 0:
+            report['source'] = mergeDict(report['source'], getVillageCoordinatesFromD(int(villages[0])))
+        if len(villages) > 1:
+            report['destination'] = mergeDict(report['destination'], getVillageCoordinatesFromD(int(villages[1])))
         if unknownEnemyTroops == False:
             lost = getRegexValues(html,'resources_medium">[^&]*&#x202d;([^&]*)&')
             report['source']['lost'] = int(lost[0].replace(',',''))
@@ -886,10 +887,16 @@ class travian(object):
         farms = self.getVillageFarms(vid)
         periodMultiply = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         for farm in farms:
+            foundInReports = False
             for reportKey in self.config['reports']:
                 report = self.config['reports'][reportKey]
-                if areCoordinatesEqual(report['destination'], farm):
+                if 'x' not in report['destination'] or 'x' not in report['source']:
                     continue
+                if areCoordinatesEqual(report['destination'], farm):
+                    foundInReports = True
+                    break
+            if foundInReports == True:
+                continue
             if 'periodPerUnit' not in farm:
                 continue
             initPeriods = self.initFarmPeriods(vid, farm, False)
@@ -911,6 +918,8 @@ class travian(object):
     def getLastDayStatistics(self, farms, troopType):
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
+            if 'x' not in report['destination'] or 'x' not in report['source']:
+                continue
             if troopTypeOfReport(report) != troopType:
                 continue
             if report['timestamp'] < time.time() - 20 * 3600 or 'stolen' not in report: # don't consider older than 20 hours
@@ -1033,13 +1042,15 @@ class travian(object):
         attackableFarms = self.getAttackableFarms(vid, troopType)
         troopsNeeded = self.calculateFarmingTroopsNeeded(vid, attackableFarms, troopType)
         troopCapacity = self.getFarmingTroopCapacity(vid, troopType)
-        self.debugLog('Periods multiplied by ' + str(nextMultiply))
+        self.debugLog('Periods multiplied by ' + str(nextMultiply) + " needed=" + str(troopsNeeded) + " capacity=" + str(troopCapacity))
 
     def calculateTroopsToSend(self, vid, farm, troopType):
         minimalFighthingStrength = 1
         maximalFighthingStrength = 1000000000
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
+            if 'x' not in report['destination'] or 'x' not in report['source']:
+                continue
             if areCoordinatesEqual(farm, report['destination']):
                 if troopTypeOfReport(report) == troopType:    
                     if report['destination']['sent'] == [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] and report['source']['dead'] != [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]:
@@ -1513,6 +1524,8 @@ class travian(object):
 
         for reportKey in self.config['reports']:
             report = self.config['reports'][reportKey]
+            if 'x' not in report['destination'] or 'x' not in report['source']:
+                continue
             if not areCoordinatesEqual(report['source'], self.config['villages'][vid]):
                 continue
             troopType = troopTypeOfReport(report)
