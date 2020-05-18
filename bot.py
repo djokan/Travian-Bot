@@ -915,6 +915,8 @@ class travian(object):
                 continue
             if report['timestamp'] < time.time() - 20 * 3600 or 'stolen' not in report: # don't consider older than 20 hours
                 continue
+            if report['capacity'] < 1:
+                continue
             for farm in farms:
                 if areCoordinatesEqual(farm, report['destination']):
                     if 'stolen' not in farm:
