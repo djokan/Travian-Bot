@@ -988,6 +988,7 @@ class travian(object):
         return troopsNeeded
 
     def alignPeriods(self, vid, troopType): # binary search to align troopsNeeded to be equal to troopCapacity
+        print('Aligning periods of village ' + vid + ' for troop type ' + str(troopType))
         upperBoundMultiply = 1
         currentMultiply = 1
         lowerBoundMultiply = 1
@@ -1099,6 +1100,8 @@ class travian(object):
     def farm(self, vid):
         self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid)
         self.enableOldTemporarilyRemovedFarms()
+        self.removeStaleFarms(vid)
+        self.addNewFarms(vid)
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
@@ -1554,10 +1557,7 @@ class travian(object):
         sentAttacks['sent'] = [attack for attack in sentAttacks['sent'] if attack['timestamp'] > int(time.time()) - 24*3600]
         saveDictionaryToJson(sentAttacks, filepath)
 
-    def getVillageFarms(self, vid, readOnly=False):
-        if readOnly == False:
-            self.doOnceInSeconds(10, self.removeStaleFarms, 'removeStaleFarms[' + vid + ']', vid)
-            self.doOnceInSeconds(10, self.addNewFarms, 'addNewFarms[' + vid + ']', vid)
+    def getVillageFarms(self, vid):
         filename = 'farms_' + vid + '.json'
         filepath = 'data/' + filename
         if not path.exists(filepath):
@@ -1574,18 +1574,18 @@ class travian(object):
         saveDictionaryToJson(farmsFile, filepath)
 
     def removeStaleFarms(self, vid):
-        farms = self.getVillageFarms(vid, True)
+        farms = self.getVillageFarms(vid)
         realFarms = getRealFarms()
         for farm in farms:
             if not farmInFarms(farm, realFarms):
                 print('Removing farm: ' + str(farm))
                 self.removeFarm(farm, vid)
 
-                if farmInFarms(farm, self.getVillageFarms(vid, True)):
+                if farmInFarms(farm, self.getVillageFarms(vid)):
                     exit(1)
 
     def addNewFarms(self, vid):
-        farms = self.getVillageFarms(vid, True)
+        farms = self.getVillageFarms(vid)
         realFarms = getRealFarms()
         for farm in realFarms:
             if not farmInFarms(farm, farms):
