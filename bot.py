@@ -938,6 +938,7 @@ class travian(object):
                     farm['capacity'] += report['capacity']
 
     def calculatePeriodsFromReports(self, vid, troopType):
+        print('Calculating farm periods from reports for troop type: ' + str(troopType))
         farms = self.getVillageFarms(vid)
         self.getLastDayStatistics(farms, troopType)
         for farm in farms:
@@ -983,15 +984,14 @@ class travian(object):
         for farm in farms:
             if not 'periodPerUnit' in farm:
                 farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
+        self.saveVillageFarms(vid, farms)
         troopTypes = []
         for i in range(len(self.config['villages'][vid]['troopCapacity'])):
             if self.config['villages'][vid]['troopCapacity'][i] > 0:
                 troopTypes.append(i)
         for troopType in troopTypes:
-            print('Calculating farm periods for troop type: ' + str(troopType))
-
-            self.calculatePeriodsFromReports(vid, troopType)
-            self.alignPeriods(vid, troopType)
+            self.doOnceInSeconds(24 * 3600, self.calculatePeriodsFromReports, 'calculatePeriodsFromReports[' + vid + '][' + str(troopType) + ']', vid, troopType)
+            self.doOnceInSeconds(3600, self.alignPeriods, 'alignPeriodsPeriodically[' + vid + '][' + str(troopType) + ']', vid, troopType)
         return True
 
     def getFarmingTroopCapacity(self, vid, troopType):
@@ -1096,6 +1096,9 @@ class travian(object):
 
         if minimalFighthingStrength > self.getFighthingStrength(troops):
             troops = oldTroops
+        if farm['periodPerUnit'][troopType] < 1500:
+            troops[troopType] *= 1500 / farm['periodPerUnit'][troopType]
+            troops[troopType] = int(troops[troopType]) + 1
         return troops
 
     def getEqualOrMoreFightingStrengthTroops(self, fs, troopType):
@@ -1116,7 +1119,7 @@ class travian(object):
         self.saveVillageFarms(vid, farms)
 
     def farm(self, vid):
-        self.doOnceInSeconds(3600 * 24, self.calculateFarmPeriods, 'calculateFarmPeriods' + vid, vid)
+        self.calculateFarmPeriods(vid)
         self.enableOldTemporarilyRemovedFarms()
         self.removeStaleFarms(vid)
         self.addNewFarms(vid)
@@ -1126,7 +1129,6 @@ class travian(object):
                 troopTypes.append(i)
         print('Sending troop types ' + str(troopTypes) + ' from village ' + vid + ' for farming.')
         for troopType in troopTypes:
-            self.doOnceInSeconds(3600, self.alignPeriods, 'alignPeriodsPeriodically[' + vid + '][' + str(troopType) + ']', vid, troopType)
             attackableFarms = self.getAttackableFarms(vid, troopType)
             for farm in attackableFarms:
                 troopsToSend = self.calculateTroopsToSend(vid, farm, troopType)
