@@ -248,7 +248,9 @@ def getSecondMarketplaceData(html):
     return data
 def getBattleLinks(html):
     temp = getRegexValues(html,'(berichte.php\\?id=\\d*%7C[a-z0-9]*&amp;t=\\d*&s=\\d*)"')
-
+    if temp == None:
+        print(html)
+        raise Exception("No battle link found")
     for i in range(len(temp)):
         temp[i] = 	temp[i].replace("&amp;","&")
     return temp
@@ -525,14 +527,16 @@ class travian(object):
 
             battles = getBattleLinks(html)
 
-            foundExistingReport = False
+            isLastReportRead = False
             for battle in battles:
                 if getBattleId(battle) in self.config['reports']:
-                    foundExistingReport = True
-                    break
+                    isLastReportRead = True
+                    continue
+                else:
+                    isLastReportRead = False
                 time.sleep(0.01*randint(10,50))
                 self.readBattleReport(battle)
-            if foundExistingReport:
+            if isLastReportRead:
                 break
 
             nextBattlePage = getNextBattlePage(html)
@@ -541,7 +545,6 @@ class travian(object):
         self.saveReportsFile()
 
     def readBattleReport(self, battleUrl):
-
         html = self.sendHTTPRequest(self.config['server'] + battleUrl, {}, False)
         report = {}
 
@@ -568,9 +571,9 @@ class travian(object):
         report['destination']['dead'] = []
 
         unknownEnemyTroops = False
-        if len(troops) > lastIndexes[1] and getRegexValue(troops[lastIndexes[1]],'>([\\d\\?]+)<') == "?":
+        if len(lastIndexes) > 1 and len(troops) > lastIndexes[1] and getRegexValue(troops[lastIndexes[1]],'>([\\d\\?]+)<') == "?":
             unknownEnemyTroops = True
-        if len(troops) > lastIndexes[2] and getRegexValue(troops[lastIndexes[2]],'>([\\d\\?]+)<') == "?":
+        if len(lastIndexes) > 2 and len(troops) > lastIndexes[2] and getRegexValue(troops[lastIndexes[2]],'>([\\d\\?]+)<') == "?":
             unknownEnemyTroops = True
 
         if len(lastIndexes) < 4 and unknownEnemyTroops == False:
@@ -946,6 +949,8 @@ class travian(object):
                 farm['coefficient'] *= 2
 
         farmsToChange = [farm for farm in farms if 'coefficient' in farm]
+        if len(farmsToChange) == 0:
+            return
         troopsNeeded = 1
         troopsToUse =  self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
         for farm in farmsToChange:
