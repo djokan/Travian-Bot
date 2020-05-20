@@ -967,17 +967,27 @@ class travian(object):
         print('Calculating farm periods from reports for troop type: ' + str(troopType))
         farms = self.getVillageFarms(vid)
         self.getLastDayStatistics(farms, troopType)
+        avgCoefficient = 0
+        numOfCoefficients = 0
         for farm in farms:
             if 'stolen' in farm:
-                averageStealPercent = 40 * farm['stolen'] / farm['capacity'] + 80 # we want periods to slowly change
+                averageStealPercent = farm['stolen'] / farm['capacity']
                 farm['coefficient'] = averageStealPercent / self.travelTime(vid, farm, troopType)
-        for farm in farms:
-            if 'coefficient' in farm and farm['stolen']/farm['capacity'] > 0.95:
-                farm['coefficient'] *= 2
+                numOfCoefficients += 1
+                avgCoefficient += farm['coefficient']
+
 
         farmsToChange = [farm for farm in farms if 'coefficient' in farm]
         if len(farmsToChange) == 0:
             return
+        avgCoefficient /= numOfCoefficients
+        for farm in farms:
+            if 'coefficient' in farm:
+                if farm['coefficient'] > avgCoefficient*2:
+                    farm['coefficient'] = avgCoefficient*2
+                if farm['stolen'] / farm['capacity'] > 0.95:
+                    farm['coefficient'] *= 2
+                farm['coefficient'] += avgCoefficient #align coefficients to change periods slowly
         troopsNeeded = 1
         troopsToUse =  self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
         for farm in farmsToChange:
@@ -988,9 +998,9 @@ class travian(object):
             for farm in farmsToChange:
                 farm['periodPerUnit'][troopType] *= periodAlign
             troopsNeeded = self.calculateFarmingTroopsNeeded(vid, farmsToChange, troopType)
-            print(troopsNeeded)
             if abs(troopsNeeded/troopsToUse - 1) < 0.01:
                 break
+        self.alignPeriods(vid, troopType)
         if abs(troopsNeeded/troopsToUse - 1) > 0.01:
             print('unaligned period calculation is wrong!')
             print(troopsNeeded)
@@ -1006,7 +1016,6 @@ class travian(object):
 
     def calculateFarmPeriods(self, vid):
         farms = self.getVillageFarms(vid)
-        print('Calculating farm periods for village: ' + vid)
         for farm in farms:
             if not 'periodPerUnit' in farm:
                 farm['periodPerUnit'] = self.initFarmPeriods(vid, farm)
@@ -1443,6 +1452,7 @@ class travian(object):
         data = mergeDict(data, getAttackData2(html))
         data['a'] = getRegexValue(html, 'value="([^"]*)" name="a" id="btn_ok"')
         if 'class="error"' in html:
+            print(getRegexValue(html, 'class="error"(.{30})'))
             self.removeFarmTemporarily({'x': attackData['x'], 'y': attackData['y']})
             return False
         for key in data:
