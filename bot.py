@@ -749,10 +749,19 @@ class travian(object):
             return False
         return True
 
+    def getBuildingId(self, vid, name):
+        if 'dorf2html' not in self.config['villages'][vid]:
+            html = self.sendHTTPRequest(self.config['server']+'dorf2.php?newdid=' + vid)
+        html = self.config['villages'][vid]['dorf2html']
+        value = getRegexValue(html,'build.php\\?id=(\\d+)\'" title="'+name)
+        if value == None:
+            return 50
+        return int(value)
+
     def goToBuildingByName(self, vid, name, linkdata):
-        html=self.sendHTTPRequest(self.config['server']+'dorf2.php?newdid=' + vid)
-        idb = getRegexValue(html,'build.php\\?id=(\\d+)\'" title="'+name)
-        return self.sendHTTPRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + idb + '&newdid=' + vid)
+        html = self.sendHTTPRequest(self.config['server']+'dorf2.php?newdid=' + vid)
+        buildingId = str(self.getBuildingId(vid, name))
+        return self.sendHTTPRequest(self.config['server'] + 'build.php?' + linkdata + 'id=' + buildingId + '&newdid=' + vid)
 
     def autoAdventure(self):
         print('Starting adventure')
@@ -857,12 +866,29 @@ class travian(object):
             self.buildBuilding(vid)
         return True
 
+    def getTournamentSquareLevel(self, vid):
+        buildingId = self.getBuildingId(vid, "Tournament Square")
+        return self.getBuildingLvl(vid, buildingId)
+
     def travelTime(self, vid, farm, troopType):
+        tournamentSquareLevel = self.getTournamentSquareLevel(vid)
+        if tournamentSquareLevel > 20:
+            tournamentSquareLevel = 0
+        tournamentSquareSpeed = 1.0 + 0.2 * tournamentSquareLevel
         vidX = self.config['villages'][vid]['x']
         farmX = farm['x']
         vidY = self.config['villages'][vid]['y']
         farmY = farm['y']
-        return int(math.sqrt((vidX-farmX)**2 + (vidY-farmY)**2)*2*3600/troopSpeed[self.config['tribe']][troopType])
+        distance = math.sqrt((vidX-farmX)**2 + (vidY-farmY)**2)
+        travelTime = 0
+        minimumTournamentSquareDistance = 20
+        if distance > minimumTournamentSquareDistance and tournamentSquareLevel > 0:
+            travelTime = minimumTournamentSquareDistance*2*3600/troopSpeed[self.config['tribe']][troopType]
+            travelTime += (distance - minimumTournamentSquareDistance)*2*3600/(tournamentSquareSpeed*troopSpeed[self.config['tribe']][troopType])
+        else:
+            travelTime = distance*2*3600/troopSpeed[self.config['tribe']][troopType]
+        travelTime = int(travelTime + 0.5)
+        return travelTime
 
     def getGlobalPeriodMultiply(self, vid):
         filename = 'GlobalPeriodMultiply' + vid + '.json'
@@ -1179,6 +1205,8 @@ class travian(object):
                 self.buildField(vid, buildingId)
 
     def getBuildingLvl(self, vid, buildingId):
+        if buildingId > 40:
+            return 30
         if buildingId <=18:
             html = self.config['villages'][vid]['dorf1html']
         else:
