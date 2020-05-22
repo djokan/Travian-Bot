@@ -1679,6 +1679,8 @@ class travian(object):
         except Exception as e:
             if shutdownIfError:
                 raise e
+            else:
+                print("WARNING! Config file read error. Reason: " + str(e))
 
     def updateConfig(self, new1):
         for element1 in new1:
