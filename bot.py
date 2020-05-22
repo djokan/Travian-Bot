@@ -17,6 +17,7 @@ from random import randint
 import os.path
 from os import path
 WAREHOUSECOEFF = 0.8
+AVERAGE_SLEEP_PERIOD = 2500
 troopSpeed = {}
 troopSpeed["Roman"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5, 20]
 troopSpeed["Gaul"] = [6, 5, 7, 16, 14, 10, 4, 3, 4, 5, 20]
@@ -972,10 +973,12 @@ class travian(object):
         for farm in farms:
             if 'stolen' in farm:
                 averageStealPercent = farm['stolen'] / farm['capacity']
-                farm['coefficient'] = averageStealPercent / self.travelTime(vid, farm, troopType)
+                travelTime = self.travelTime(vid, farm, troopType)
+                if travelTime > AVERAGE_SLEEP_PERIOD:
+                    travelTime = AVERAGE_SLEEP_PERIOD # We can't have period lower than
+                farm['coefficient'] = averageStealPercent / travelTime
                 numOfCoefficients += 1
                 avgCoefficient += farm['coefficient']
-
 
         farmsToChange = [farm for farm in farms if 'coefficient' in farm]
         if len(farmsToChange) == 0:
@@ -1131,8 +1134,8 @@ class travian(object):
 
         if minimalFighthingStrength > self.getFighthingStrength(troops):
             troops = oldTroops
-        if farm['periodPerUnit'][troopType] < 1500:
-            troops[troopType] *= 1500 / farm['periodPerUnit'][troopType]
+        if farm['periodPerUnit'][troopType] < AVERAGE_SLEEP_PERIOD:
+            troops[troopType] *= AVERAGE_SLEEP_PERIOD / farm['periodPerUnit'][troopType]
             troops[troopType] = int(troops[troopType]) + 1
         return troops
 
