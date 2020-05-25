@@ -1134,9 +1134,10 @@ class travian(object):
 
         if minimalFighthingStrength > self.getFighthingStrength(troops):
             troops = oldTroops
-        if farm['periodPerUnit'][troopType] < AVERAGE_SLEEP_PERIOD:
-            troops[troopType] *= AVERAGE_SLEEP_PERIOD / farm['periodPerUnit'][troopType]
-            troops[troopType] = int(troops[troopType]) + 1
+        period = farm['periodPerUnit'][troopType] * troops[troopType]
+        if period < AVERAGE_SLEEP_PERIOD:
+            troops[troopType] *= AVERAGE_SLEEP_PERIOD / period
+            troops[troopType] = int(math.ceil(troops[troopType]))
         return troops
 
     def getEqualOrMoreFightingStrengthTroops(self, fs, troopType):
